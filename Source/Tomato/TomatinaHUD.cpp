@@ -23,17 +23,11 @@
 
 #include "TomatinaPlayerPawn.h"
 
-// =============================================================================
-// コンストラクタ
-// =============================================================================
 ATomatinaHUD::ATomatinaHUD()
 {
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-// =============================================================================
-// BeginPlay — 永続 Widget を生成
-// =============================================================================
 void ATomatinaHUD::BeginPlay()
 {
 	if (bDebugHUDLog)
@@ -49,7 +43,6 @@ void ATomatinaHUD::BeginPlay()
 		return;
 	}
 
-	// ── PlayerPawn から 4 サイズと bTestMode を取得 ──
 	if (ATomatinaPlayerPawn* Pawn = Cast<ATomatinaPlayerPawn>(PC->GetPawn()))
 	{
 		MainWidth               = Pawn->MainWidth;
@@ -84,7 +77,6 @@ void ATomatinaHUD::BeginPlay()
 		}
 	}
 
-	// ── ViewFinder (旧・スパンウィンドウ方式のときだけメインに追加) ──
 	if (!bUseSeparatePhoneWindow)
 	{
 		if (ViewFinderWidgetClass)
@@ -100,7 +92,6 @@ void ATomatinaHUD::BeginPlay()
 		else { UE_LOG(LogTemp, Error, TEXT("ATomatinaHUD: ViewFinderWidgetClass 未設定")); }
 	}
 
-	// ── DirtOverlay ─────────────────────────────
 	if (DirtOverlayWidgetClass)
 	{
 		DirtOverlayWidget = CreateWidget<UUserWidget>(PC, DirtOverlayWidgetClass);
@@ -108,7 +99,6 @@ void ATomatinaHUD::BeginPlay()
 	}
 	else { UE_LOG(LogTemp, Error, TEXT("ATomatinaHUD: DirtOverlayWidgetClass 未設定")); }
 
-	// ── Cursor ─────────────────────────────
 	if (CursorWidgetClass)
 	{
 		CursorWidget = CreateWidget<UUserWidget>(PC, CursorWidgetClass);
@@ -120,7 +110,6 @@ void ATomatinaHUD::BeginPlay()
 	}
 	else { UE_LOG(LogTemp, Error, TEXT("ATomatinaHUD: CursorWidgetClass 未設定")); }
 
-	// ── MissionDisplay（HUD 常時表示：お題・タイマー・スコア） ──
 	if (MissionDisplayWidgetClass)
 	{
 		MissionDisplayWidget = CreateWidget<UUserWidget>(PC, MissionDisplayWidgetClass);
@@ -133,7 +122,6 @@ void ATomatinaHUD::BeginPlay()
 	}
 	else { UE_LOG(LogTemp, Error, TEXT("ATomatinaHUD: MissionDisplayWidgetClass 未設定")); }
 
-	// ── TestPip（開発用・スパン方式のみ） ─────────────────────────────
 	if (!bUseSeparatePhoneWindow && bTestMode && TestPipWidgetClass)
 	{
 		TestPipWidget = CreateWidget<UUserWidget>(PC, TestPipWidgetClass);
@@ -146,7 +134,6 @@ void ATomatinaHUD::BeginPlay()
 		}
 	}
 
-	// ── 第二ウィンドウ方式：スマホ側独立 SWindow を生成 ─────────────────
 	if (bUseSeparatePhoneWindow)
 	{
 		CreatePhoneWindow();
@@ -158,18 +145,12 @@ void ATomatinaHUD::BeginPlay()
 	}
 }
 
-// =============================================================================
-// EndPlay — 第二ウィンドウのクリーンアップ
-// =============================================================================
 void ATomatinaHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	DestroyPhoneWindow();
 	Super::EndPlay(EndPlayReason);
 }
 
-// =============================================================================
-// CreatePhoneWindow — スマホ側を独立 SWindow として生成し UMG を貼る
-// =============================================================================
 void ATomatinaHUD::CreatePhoneWindow()
 {
 	if (!FSlateApplication::IsInitialized())
@@ -211,7 +192,6 @@ void ATomatinaHUD::CreatePhoneWindow()
 		}
 	}
 
-	// PhoneSplatContainer も同様に親全面で覆う (ここに汚れが動的生成される)
 	if (UCanvasPanel* SplatC = Cast<UCanvasPanel>(PhoneViewWidget->GetWidgetFromName(TEXT("PhoneSplatContainer"))))
 	{
 		ForceWidgetToFillParentCanvas(SplatC, TEXT("PhoneSplatContainer"));
@@ -239,7 +219,6 @@ void ATomatinaHUD::CreatePhoneWindow()
 	FSlateApplication::Get().AddWindow(NewWindow, true);
 	PhoneWindow = NewWindow;
 
-	// UMG 側を Slate ツリーにアタッチ
 	PhoneWindow->SetContent(PhoneViewWidget->TakeWidget());
 
 	// AddWindow 直後は ScreenPosition が反映されないケースがあるので明示的に移動
@@ -254,9 +233,6 @@ void ATomatinaHUD::CreatePhoneWindow()
 	}
 }
 
-// =============================================================================
-// DestroyPhoneWindow — 第二ウィンドウ破棄
-// =============================================================================
 void ATomatinaHUD::DestroyPhoneWindow()
 {
 	if (PhoneWindow.IsValid())
@@ -270,9 +246,6 @@ void ATomatinaHUD::DestroyPhoneWindow()
 	PhoneViewWidget = nullptr;
 }
 
-// =============================================================================
-// BindZoomMaterialToWidget
-// =============================================================================
 bool ATomatinaHUD::BindZoomMaterialToWidget(UUserWidget* Widget, FName PreferredImageName, const TCHAR* WidgetLabel)
 {
 	if (!Widget)
@@ -293,9 +266,6 @@ bool ATomatinaHUD::BindZoomMaterialToWidget(UUserWidget* Widget, FName Preferred
 	return ConfigureZoomImageContent(ZoomImage, WidgetLabel);
 }
 
-// =============================================================================
-// LayoutPhoneZoomImage
-// =============================================================================
 void ATomatinaHUD::LayoutPhoneZoomImage(UUserWidget* Widget, FName PreferredImageName, const TCHAR* WidgetLabel)
 {
 	if (!Widget)
@@ -350,9 +320,6 @@ void ATomatinaHUD::LayoutPhoneZoomImage(UUserWidget* Widget, FName PreferredImag
 	}
 }
 
-// =============================================================================
-// FindOrCreateZoomImage
-// =============================================================================
 UImage* ATomatinaHUD::FindOrCreateZoomImage(UUserWidget* Widget, FName PreferredImageName, const TCHAR* WidgetLabel)
 {
 	if (!Widget) { return nullptr; }
@@ -385,7 +352,7 @@ UImage* ATomatinaHUD::FindOrCreateZoomImage(UUserWidget* Widget, FName Preferred
 		}
 	}
 
-	// どこにも無い場合は CanvasPanel に実行時生成して強制的に表示先を作る
+	// ZoomViewがない古いWidget用の保険
 	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(Tree->RootWidget);
 	if (!RootCanvas)
 	{
@@ -412,7 +379,6 @@ UImage* ATomatinaHUD::FindOrCreateZoomImage(UUserWidget* Widget, FName Preferred
 
 	if (RootCanvas->AddChildToCanvas(RuntimeZoomImage))
 	{
-		// 親 CanvasPanel 全面に塗る (Anchor 0,0〜1,1 / Offset 全0)
 		ForceWidgetToFillParentCanvas(RuntimeZoomImage, TEXT("IMG_ZoomView_Runtime"));
 	}
 
@@ -426,9 +392,6 @@ UImage* ATomatinaHUD::FindOrCreateZoomImage(UUserWidget* Widget, FName Preferred
 	return RuntimeZoomImage;
 }
 
-// =============================================================================
-// ConfigureZoomImageContent
-// =============================================================================
 bool ATomatinaHUD::ConfigureZoomImageContent(UImage* ImageWidget, const TCHAR* WidgetLabel)
 {
 	if (!ImageWidget)
@@ -539,9 +502,6 @@ bool ATomatinaHUD::ForceWidgetToFillParentCanvas(UWidget* Widget, const TCHAR* W
 	return true;
 }
 
-// =============================================================================
-// ValidateMissionStylishWidgets
-// =============================================================================
 void ATomatinaHUD::ValidateMissionStylishWidgets()
 {
 	if (!MissionDisplayWidget)
@@ -573,9 +533,6 @@ void ATomatinaHUD::ValidateMissionStylishWidgets()
 	}
 }
 
-// =============================================================================
-// Tick — シャッターフラッシュの実時間制御
-// =============================================================================
 void ATomatinaHUD::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -592,7 +549,6 @@ void ATomatinaHUD::Tick(float DeltaSeconds)
 		}
 	}
 
-	// ── 第二ウィンドウの ZoomView 強制リフレッシュ ─────────────────────
 	// Slate がセカンダリ SWindow で RT ブラシを再サンプルしないバグへの対策。
 	// DMI 経由なら毎フレーム RT パラメータを再注入すると material が再評価され
 	// 最新の RT 内容がサンプルされる。直接 RT バインドの場合は SetBrush() を
@@ -606,7 +562,6 @@ void ATomatinaHUD::Tick(float DeltaSeconds)
 
 		if (PhoneZoomDMI && ZoomRT)
 		{
-			// DMI パラメータ再注入で material を毎フレーム再評価させる
 			PhoneZoomDMI->SetTextureParameterValue(TEXT("RT_Zoom"),  ZoomRT);
 			PhoneZoomDMI->SetTextureParameterValue(TEXT("Texture"),  ZoomRT);
 			PhoneZoomDMI->SetTextureParameterValue(TEXT("MainTex"),  ZoomRT);
@@ -631,10 +586,6 @@ void ATomatinaHUD::Tick(float DeltaSeconds)
 	}
 }
 
-// =============================================================================
-// UpdateCursorPosition（例外1）
-// IMG_Crosshair の CanvasPanelSlot をメイン座標 → iPhone 座標にマップ
-// =============================================================================
 void ATomatinaHUD::UpdateCursorPosition(FVector2D Pos)
 {
 	const float NormX = (MainWidth  > 0.f) ? Pos.X / MainWidth  : 0.f;
@@ -642,7 +593,6 @@ void ATomatinaHUD::UpdateCursorPosition(FVector2D Pos)
 
 	if (bUseSeparatePhoneWindow && PhoneViewWidget)
 	{
-		// 第二ウィンドウ方式：スマホウィンドウ内ローカル座標 (0..PhoneWidth, 0..PhoneHeight)
 		UImage* PhoneCrosshair = Cast<UImage>(
 			PhoneViewWidget->GetWidgetFromName(TEXT("IMG_PhoneCursor")));
 		if (!PhoneCrosshair) { return; }
@@ -654,7 +604,6 @@ void ATomatinaHUD::UpdateCursorPosition(FVector2D Pos)
 		return;
 	}
 
-	// 旧・スパンウィンドウ方式：メインウィンドウ内 (MainWidth 以降) に配置
 	if (!CursorWidget) { return; }
 
 	UImage* Crosshair = Cast<UImage>(CursorWidget->GetWidgetFromName(TEXT("IMG_Crosshair")));
@@ -668,9 +617,6 @@ void ATomatinaHUD::UpdateCursorPosition(FVector2D Pos)
 	Slot->SetPosition(FVector2D(PhoneX, PhoneY));
 }
 
-// =============================================================================
-// ShowCursor / HideCursor
-// =============================================================================
 void ATomatinaHUD::ShowCursor()
 {
 	if (bDebugHUDLog)
@@ -711,10 +657,6 @@ void ATomatinaHUD::HideCursor()
 	if (CursorWidget) { CursorWidget->SetVisibility(ESlateVisibility::Hidden); }
 }
 
-// =============================================================================
-// UpdateTowelPosition — DirtOverlay 内の IMG_Towel をメイン画面のピクセル座標に動かす
-// 入力 Pos: 正規化座標 (0〜1)
-// =============================================================================
 void ATomatinaHUD::UpdateTowelPosition(FVector2D Pos)
 {
 	if (!DirtOverlayWidget) { return; }
@@ -736,9 +678,6 @@ void ATomatinaHUD::UpdateTowelPosition(FVector2D Pos)
 	Slot->SetPosition(FVector2D(Pos.X * AreaWidth, Pos.Y * AreaHeight));
 }
 
-// =============================================================================
-// ShowTowel / HideTowel — IMG_Towel の表示切替
-// =============================================================================
 void ATomatinaHUD::ShowTowel()
 {
 	if (!DirtOverlayWidget) { return; }
@@ -757,10 +696,6 @@ void ATomatinaHUD::HideTowel()
 	}
 }
 
-// =============================================================================
-// ShowResult — 撮影後の結果（WBP_PhotoResult）
-// IMG_Photo の上にある SplatContainer に撮影時の汚れを同じ正規化座標で重ねる
-// =============================================================================
 void ATomatinaHUD::ShowResult(int32 Score, const FString& Comment, const TArray<FDirtSplat>& Dirts)
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::ShowResult Score=%d Dirts=%d"),
@@ -785,21 +720,18 @@ void ATomatinaHUD::ShowResult(int32 Score, const FString& Comment, const TArray<
 	if (!PhotoResultWidget) { return; }
 	PhotoResultWidget->AddToViewport(300);
 
-	// TXT_Score
 	if (UTextBlock* TxtScore = Cast<UTextBlock>(
 			PhotoResultWidget->GetWidgetFromName(TEXT("TXT_Score"))))
 	{
 		TxtScore->SetText(FText::FromString(FString::Printf(TEXT("%d 点"), Score)));
 	}
 
-	// TXT_Comment
 	if (UTextBlock* TxtComment = Cast<UTextBlock>(
 			PhotoResultWidget->GetWidgetFromName(TEXT("TXT_Comment"))))
 	{
 		TxtComment->SetText(FText::FromString(Comment));
 	}
 
-	// IMG_Photo（M_PhotoDisplay をマテリアルとしてセット）
 	if (UImage* ImgPhoto = Cast<UImage>(
 			PhotoResultWidget->GetWidgetFromName(TEXT("IMG_Photo"))))
 	{
@@ -833,9 +765,6 @@ void ATomatinaHUD::HideResult()
 	}
 }
 
-// =============================================================================
-// ShowMissionResult — 時間切れ表示（WBP_MissionResult）
-// =============================================================================
 void ATomatinaHUD::ShowMissionResult(int32 Score, const FString& Comment)
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::ShowMissionResult Score=%d"), Score);
@@ -875,9 +804,6 @@ void ATomatinaHUD::HideMissionResult()
 	}
 }
 
-// =============================================================================
-// ShowFinalResult — 全ミッション終了（WBP_FinalResult）
-// =============================================================================
 void ATomatinaHUD::ShowFinalResult(int32 InTotalScore, int32 MissionCount,
 	const FString& AverageStylishRank, float SyncRate01)
 {
@@ -898,14 +824,13 @@ void ATomatinaHUD::ShowFinalResult(int32 InTotalScore, int32 MissionCount,
 	if (!FinalResultWidget) { return; }
 	FinalResultWidget->AddToViewport(500);
 
-	// ── 総合点 ──
 	if (UTextBlock* TxtScore = Cast<UTextBlock>(
 			FinalResultWidget->GetWidgetFromName(TEXT("TXT_FinalScore"))))
 	{
 		TxtScore->SetText(FText::AsNumber(InTotalScore));
 	}
 
-	// ── 総合ランク（平均点基準。旧互換） ──
+	// 旧互換: 総合ランクは平均点基準
 	const float Avg = (MissionCount > 0) ? static_cast<float>(InTotalScore) / MissionCount : 0.f;
 	FString Rank;
 	if      (Avg >= 80.f) { Rank = TEXT("S"); }
@@ -919,14 +844,12 @@ void ATomatinaHUD::ShowFinalResult(int32 InTotalScore, int32 MissionCount,
 		TxtRank->SetText(FText::FromString(Rank));
 	}
 
-	// ── 平均スタイリッシュランク (撮影ごとに記録したランクの平均) ──
 	if (UTextBlock* TxtAvgRank = Cast<UTextBlock>(
 			FinalResultWidget->GetWidgetFromName(TEXT("TXT_AverageRank"))))
 	{
 		TxtAvgRank->SetText(FText::FromString(AverageStylishRank));
 	}
 
-	// ── 1P-2P シンクロ率 (百分率表示) ──
 	const float Percent = FMath::Clamp(SyncRate01, 0.f, 1.f) * 100.f;
 	if (UTextBlock* TxtSync = Cast<UTextBlock>(
 			FinalResultWidget->GetWidgetFromName(TEXT("TXT_SyncRate"))))
@@ -941,9 +864,6 @@ void ATomatinaHUD::ShowFinalResult(int32 InTotalScore, int32 MissionCount,
 	}
 }
 
-// =============================================================================
-// ShowMissionDisplay — お題テキスト・プレビュー画像
-// =============================================================================
 void ATomatinaHUD::ShowMissionDisplay(const FText& MissionText, UTexture2D* TargetImage)
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::ShowMissionDisplay '%s'"),
@@ -977,9 +897,6 @@ void ATomatinaHUD::HideMissionDisplay()
 	}
 }
 
-// =============================================================================
-// UpdateTimer — MissionDisplay の TXT_Timer を更新
-// =============================================================================
 void ATomatinaHUD::UpdateTimer(float RemainingSeconds)
 {
 	if (!MissionDisplayWidget) { return; }
@@ -991,9 +908,6 @@ void ATomatinaHUD::UpdateTimer(float RemainingSeconds)
 	}
 }
 
-// =============================================================================
-// UpdateGameTimer — MissionDisplay の TXT_GameTimer / PB_GameTimer を更新（ゲーム全体）
-// =============================================================================
 void ATomatinaHUD::UpdateGameTimer(float RemainingSeconds, float TotalSeconds)
 {
 	if (!MissionDisplayWidget) { return; }
@@ -1002,7 +916,6 @@ void ATomatinaHUD::UpdateGameTimer(float RemainingSeconds, float TotalSeconds)
 	const int32 Mins = FMath::FloorToInt(Clamped / 60.f);
 	const int32 Secs = FMath::FloorToInt(Clamped) % 60;
 
-	// TXT_GameTimer （例: "1:23" ） 分:秒 表記
 	if (UTextBlock* Txt = Cast<UTextBlock>(
 			MissionDisplayWidget->GetWidgetFromName(TEXT("TXT_GameTimer"))))
 	{
@@ -1010,7 +923,6 @@ void ATomatinaHUD::UpdateGameTimer(float RemainingSeconds, float TotalSeconds)
 			FString::Printf(TEXT("%d:%02d"), Mins, Secs)));
 	}
 
-	// PB_GameTimer （ProgressBar。0〜1 の比率）
 	if (UProgressBar* Bar = Cast<UProgressBar>(
 			MissionDisplayWidget->GetWidgetFromName(TEXT("PB_GameTimer"))))
 	{
@@ -1021,9 +933,6 @@ void ATomatinaHUD::UpdateGameTimer(float RemainingSeconds, float TotalSeconds)
 	}
 }
 
-// =============================================================================
-// UpdateTotalScore — MissionDisplay の TXT_TotalScore を更新
-// =============================================================================
 void ATomatinaHUD::UpdateTotalScore(int32 InTotalScore)
 {
 	if (!MissionDisplayWidget) { return; }
@@ -1035,11 +944,6 @@ void ATomatinaHUD::UpdateTotalScore(int32 InTotalScore)
 	}
 }
 
-// =============================================================================
-// UpdateStylishDisplay — MissionDisplay のスタイリッシュ UI を更新
-// 対象 Widget 名:
-//   TXT_StylishRank, TXT_StylishCombo, PB_StylishGauge
-// =============================================================================
 void ATomatinaHUD::UpdateStylishDisplay(const FString& RankText, float GaugePercent, int32 ComboCount, bool bDanger)
 {
 	if (!MissionDisplayWidget) { return; }
@@ -1078,9 +982,6 @@ void ATomatinaHUD::UpdateStylishDisplay(const FString& RankText, float GaugePerc
 	}
 }
 
-// =============================================================================
-// ShowCountdown / HideCountdown — WBP_CountdownDisplay
-// =============================================================================
 void ATomatinaHUD::ShowCountdown(int32 Seconds)
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::ShowCountdown %d"), Seconds);
@@ -1113,10 +1014,6 @@ void ATomatinaHUD::HideCountdown()
 	}
 }
 
-// =============================================================================
-// ShowLoading / HideLoading — WBP_Loading
-// カウントダウン前に「ロード中...」を表示する。
-// =============================================================================
 void ATomatinaHUD::ShowLoading()
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::ShowLoading"));
@@ -1145,9 +1042,6 @@ void ATomatinaHUD::HideLoading()
 	}
 }
 
-// =============================================================================
-// PlayShutterFlash — WBP_ShutterFlash を 0.1 秒だけ表示
-// =============================================================================
 void ATomatinaHUD::PlayShutterFlash()
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaHUD::PlayShutterFlash"));
@@ -1169,13 +1063,8 @@ void ATomatinaHUD::PlayShutterFlash()
 	FlashElapsed = 0.f;
 }
 
-// =============================================================================
-// UpdateDirtDisplay（例外2）
-// SplatContainer 内に汚れ UImage を動的生成。メイン側・iPhone 側の 2 箇所に配置。
-// =============================================================================
 void ATomatinaHUD::UpdateDirtDisplay(const TArray<FDirtSplat>& Dirts)
 {
-	// ── メインウィンドウ側 (中央 MainDirtAreaRatio のサブエリアに制限) ──
 	// Container の実 widget-space サイズを cached geometry から取得して、
 	// DPI スケーリング・レイアウト環境に依存せず正しく収まるようにする。
 	if (DirtOverlayWidget)
@@ -1223,9 +1112,6 @@ void ATomatinaHUD::UpdateDirtDisplay(const TArray<FDirtSplat>& Dirts)
 	}
 }
 
-// =============================================================================
-// AddDirtSplatsToCanvas — 汚れ UImage を動的生成する共通ヘルパー
-// =============================================================================
 void ATomatinaHUD::AddDirtSplatsToCanvas(
 	UUserWidget* OwnerWidget,
 	UCanvasPanel* Container,
@@ -1249,7 +1135,6 @@ void ATomatinaHUD::AddDirtSplatsToCanvas(
 
 		UImage* Img = NewObject<UImage>(OwnerWidget);
 
-		// TextureIndex で DirtTextures から画像を選択。範囲外なら DirtTexture にフォールバック
 		UTexture2D* UseTex = nullptr;
 		if (DirtTextures.IsValidIndex(Dirt.TextureIndex))
 		{
@@ -1263,13 +1148,11 @@ void ATomatinaHUD::AddDirtSplatsToCanvas(
 		UCanvasPanelSlot* Slot = Container->AddChildToCanvas(Img);
 		if (!Slot) { continue; }
 
-		// Size は正規化スケール（0〜1）想定。1.0 を超える異常値は領域幅にクランプ。
-		// SizeScale で領域ごとに追加のサイズ縮小をかけられる (スマホ/写真用)。
+		// Sizeは正規化値。スマホ/写真はSizeScaleで少し抑える。
 		const float ClampedNormSize = FMath::Clamp(Dirt.Size, 0.01f, 1.0f);
 		const float Size     = ClampedNormSize * AreaWidth * SafeSizeScale;
 		const float HalfSize = Size * 0.5f;
 
-		// 中心座標を領域内に計算 → 汚れ全体が領域＋内側マージンに収まるようクランプ
 		float CenterX = Dirt.NormalizedPosition.X * AreaWidth;
 		float CenterY = Dirt.NormalizedPosition.Y * AreaHeight;
 
@@ -1289,9 +1172,6 @@ void ATomatinaHUD::AddDirtSplatsToCanvas(
 	}
 }
 
-// =============================================================================
-// UpdateTowelStatus — DirtOverlay 内の PB_TowelStamina / TXT_SwapMessage を更新
-// =============================================================================
 void ATomatinaHUD::UpdateTowelStatus(float DurabilityPercent, bool bSwapping)
 {
 	if (!DirtOverlayWidget) { return; }

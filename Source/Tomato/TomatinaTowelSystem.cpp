@@ -14,11 +14,7 @@
 #include "TomatoDirtManager.h"
 #include "TomatinaPlayerPawn.h"
 #include "TomatinaHUD.h"
-#include "TomatinaFunctionLibrary.h"  // PlayTomatinaCue2D
-
-// =============================================================================
-// コンストラクタ
-// =============================================================================
+#include "TomatinaFunctionLibrary.h"
 
 ATomatinaTowelSystem::ATomatinaTowelSystem()
 	: CachedDirtManager(nullptr)
@@ -27,10 +23,6 @@ ATomatinaTowelSystem::ATomatinaTowelSystem()
 	PrimaryActorTick.bCanEverTick = true;
 	LeapComponent = CreateDefaultSubobject<ULeapComponent>(TEXT("LeapComponent"));
 }
-
-// =============================================================================
-// BeginPlay
-// =============================================================================
 
 void ATomatinaTowelSystem::BeginPlay()
 {
@@ -48,10 +40,6 @@ void ATomatinaTowelSystem::BeginPlay()
 			CurrentDurability, MinSpeedToWipe, WipeRadius);
 	}
 }
-
-// =============================================================================
-// UpdateHandData（BP から毎フレーム呼ぶ）
-// =============================================================================
 
 void ATomatinaTowelSystem::UpdateHandData(bool bDetected, FVector2D ScreenPosition, float Speed)
 {
@@ -121,17 +109,12 @@ bool ATomatinaTowelSystem::TickTowelSwap(float DeltaTime, ATomatinaHUD* HUD)
 		UE_LOG(LogTemp, Warning,
 			TEXT("ATomatinaTowelSystem: タオル交換完了 Durability=%.1f"), CurrentDurability);
 
-		// 交換完了 SE
 		UTomatinaFunctionLibrary::PlayTomatinaCue2D(this, TowelReadySound);
 	}
 
 	UpdateTowelHUDStatus(HUD);
 	return true;
 }
-
-// =============================================================================
-// Tick
-// =============================================================================
 
 void ATomatinaTowelSystem::Tick(float DeltaTime)
 {
@@ -154,6 +137,9 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 	bWipeHadDirtManagerThisFrame = false;
 	LastWipeAmount = 0.0f;
 	LastAdjustedWipeRadius = 0.0f;
+	LastWipeSegmentLength = 0.0f;
+	LastWipeSampleCount = 0;
+	LastWipeAmountPerSample = 0.0f;
 
 	if (bHandDetected)
 	{
@@ -183,18 +169,41 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 
 			// 短時間ロスト中は最後のスムージング済み座標を保持し、速度だけ線形に落とす。
 			// これにより端で一瞬外れても拭き取り中心は途切れにくく、長く拭き続けることはない。
-			const float GraceAlpha = 1.0f - FMath::Clamp(LostTime / FMath::Max(InputGraceTime, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+			const float DecayStartTime = InputGraceTime * FMath::Clamp(SpeedDecayStartRatio, 0.0f, 1.0f);
 			SmoothedHandScreenPosition = LastValidSmoothedHandScreenPosition;
 			ClampedHandScreenPosition = LastValidClampedHandScreenPosition;
 			HandScreenPosition = ClampedHandScreenPosition;
-			ProcessedHandSpeed = LastValidHandSpeed * GraceAlpha;
+			if (LostTime <= DecayStartTime)
+			{
+				ProcessedHandSpeed = LastValidHandSpeed;
+			}
+			else
+			{
+				const float DecayDuration = FMath::Max(InputGraceTime - DecayStartTime, KINDA_SMALL_NUMBER);
+				const float DecayAlpha = 1.0f - FMath::Clamp((LostTime - DecayStartTime) / DecayDuration, 0.0f, 1.0f);
+				ProcessedHandSpeed = LastValidHandSpeed * DecayAlpha;
+			}
 		}
 	}
+
+	bLastGraceJustExited = bWasUsingGraceInput && !bUsingGraceInput;
 
 	// タオル交換は入力が無い間も進める。先に no-input return すると、
 	// 手を離した瞬間に交換タイマーと「交換中」UIが止まってしまう。
 	if (TickTowelSwap(DeltaTime, HUD))
 	{
+		if (bHasValidInput)
+		{
+			bHasPrevWipePosition = true;
+			PrevClampedHandScreenPosition = ClampedHandScreenPosition;
+		}
+		else
+		{
+			bHasPrevWipePosition = false;
+			PrevClampedHandScreenPosition = FVector2D(-1.0f, -1.0f);
+		}
+		bWasUsingGraceInput = bUsingGraceInput;
+		LogLeapInputFrame(false);
 		return;
 	}
 
@@ -204,16 +213,18 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 		bTowelInZoomView = false;
 		ProcessedHandSpeed = 0.0f;
 		ResetHandInputFilter();
+		bHasPrevWipePosition = false;
+		PrevClampedHandScreenPosition = FVector2D(-1.0f, -1.0f);
 
-		// 拭き音を止める（手が離れたら即停止）
 		UpdateWipeSound(false);
 
 		HideTowelVisual(HUD);
 		UpdateTowelHUDStatus(HUD);
+		bWasUsingGraceInput = bUsingGraceInput;
+		LogLeapInputFrame(false);
 		return;
 	}
 
-	// 手検出中：タオルを表示
 	bTowelVisible = true;
 
 	if (HUD)
@@ -227,11 +238,13 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 		}
 	}
 
-	// 拭き取り処理
-	const bool bIsWiping = (ProcessedHandSpeed >= MinSpeedToWipe);
+	const float ContinueSpeedFactor = FMath::Clamp(WipeContinueSpeedFactor, 0.1f, 1.0f);
+	const float CurrentMinSpeed = bWasWiping
+		? MinSpeedToWipe * ContinueSpeedFactor
+		: MinSpeedToWipe;
+	const bool bIsWiping = (ProcessedHandSpeed >= CurrentMinSpeed);
 	UpdateWipeSound(bIsWiping);
 
-	// [DIAG] 拭き状態が変化した瞬間だけログ
 	{
 		static bool bDiagWasWiping = false;
 		if (bDebugLeapInput && bIsWiping != bDiagWasWiping)
@@ -240,7 +253,7 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 			UE_LOG(LogTemp, Warning,
 				TEXT("[TowelDiag] WipingState=%s ProcessedSpeed=%.2f RawSpeed=%.2f Min=%.2f"),
 				bIsWiping ? TEXT("ON") : TEXT("OFF"),
-				ProcessedHandSpeed, HandSpeed, MinSpeedToWipe);
+				ProcessedHandSpeed, HandSpeed, CurrentMinSpeed);
 		}
 	}
 
@@ -249,18 +262,42 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 		CurrentDurability -= DurabilityDrainRate * DeltaTime;
 
 		const float Amount = WipeEfficiency * ProcessedHandSpeed * SpeedMultiplier * DeltaTime;
-		const float AdjustedWipeRadius = CalculateEdgeAdjustedWipeRadius(ClampedHandScreenPosition);
+		const FVector2D CurrentPos = ClampedHandScreenPosition;
+		const bool bUseLineSegment = bHasPrevWipePosition && !bLastGraceJustExited;
+		const float SegmentLength = bHasPrevWipePosition
+			? (CurrentPos - PrevClampedHandScreenPosition).Size()
+			: 0.0f;
+		const float SampleSpacing = WipeRadius * SampleSpacingFactor;
+		const int32 RawSampleCount = bUseLineSegment
+			? FMath::CeilToInt(SegmentLength / FMath::Max(SampleSpacing, KINDA_SMALL_NUMBER))
+			: 1;
+		const int32 SampleCount = FMath::Clamp(RawSampleCount, 1, FMath::Clamp(MaxWipeSamples, 1, 32));
+		const float AmountPerSample = Amount / FMath::Max(SampleCount, 1);
 		bWipeAttemptedThisFrame = true;
-		LastWipePosition = ClampedHandScreenPosition;
-		LastAdjustedWipeRadius = AdjustedWipeRadius;
+		LastWipePosition = CurrentPos;
 		LastWipeAmount = Amount;
+		LastWipeSegmentLength = SegmentLength;
+		LastWipeSampleCount = SampleCount;
+		LastWipeAmountPerSample = AmountPerSample;
 		if (ATomatoDirtManager* DirtMgr = GetDirtManager())
 		{
 			bWipeHadDirtManagerThisFrame = true;
-			DirtMgr->WipeDirtAt(ClampedHandScreenPosition, AdjustedWipeRadius, Amount);
+			for (int32 SampleIndex = 0; SampleIndex < SampleCount; ++SampleIndex)
+			{
+				const float Alpha = (SampleCount == 1)
+					? 1.0f
+					: static_cast<float>(SampleIndex) / static_cast<float>(SampleCount - 1);
+				const FVector2D SamplePos = bUseLineSegment
+					? FMath::Lerp(PrevClampedHandScreenPosition, CurrentPos, Alpha)
+					: CurrentPos;
+				const float SampleRadius = CalculateEdgeAdjustedWipeRadius(SamplePos);
+				LastAdjustedWipeRadius = SampleRadius;
+				DirtMgr->WipeDirtAt(SamplePos, SampleRadius, AmountPerSample);
+			}
 		}
 		else
 		{
+			LastAdjustedWipeRadius = CalculateEdgeAdjustedWipeRadius(CurrentPos);
 			if (bDebugLeapInput && !bWarnedMissingDirtManager)
 			{
 				bWarnedMissingDirtManager = true;
@@ -277,20 +314,18 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 			UE_LOG(LogTemp, Warning,
 				TEXT("ATomatinaTowelSystem: 耐久値切れ → タオル交換開始 (%.1f 秒)"), SwapDuration);
 
-			// タオル破損 SE
 			UTomatinaFunctionLibrary::PlayTomatinaCue2D(this, TowelBreakSound);
 		}
 	}
 
 	UpdateTowelHUDStatus(HUD);
 
-	// ズーム映像へのタオル映り込み判定
 	bTowelInZoomView = CheckTowelInView(ClampedHandScreenPosition);
+	bHasPrevWipePosition = true;
+	PrevClampedHandScreenPosition = ClampedHandScreenPosition;
+	bWasUsingGraceInput = bUsingGraceInput;
+	LogLeapInputFrame(bIsWiping);
 }
-
-// =============================================================================
-// Leap Motion 入力安定化
-// =============================================================================
 
 FVector2D ATomatinaTowelSystem::ClampNormalizedHandPosition(FVector2D Position) const
 {
@@ -304,7 +339,9 @@ void ATomatinaTowelSystem::PollLeapInputFromCpp(float DeltaTime)
 	if (!bReadLeapInputInCpp)
 	{
 		SetLeapInputStatus(TEXT("C++ Leap input disabled"));
-		UpdateLeapTooCloseState(FVector::ZeroVector, false);
+		bLastLeapInputGated = false;
+		LastRawLeapHandSpeed = 0.0f;
+		UpdateLeapTooCloseState(FVector::ZeroVector, false, DeltaTime);
 		return;
 	}
 
@@ -312,7 +349,9 @@ void ATomatinaTowelSystem::PollLeapInputFromCpp(float DeltaTime)
 	{
 		SetLeapInputStatus(TEXT("LeapComponent is null"));
 		UpdateHandData(false, RawHandScreenPosition, 0.0f);
-		UpdateLeapTooCloseState(FVector::ZeroVector, false);
+		bLastLeapInputGated = false;
+		LastRawLeapHandSpeed = 0.0f;
+		UpdateLeapTooCloseState(FVector::ZeroVector, false, DeltaTime);
 		bHasLastCppLeapScreenPosition = false;
 		bLastCppLeapHadSelectedHand = false;
 		return;
@@ -357,7 +396,12 @@ void ATomatinaTowelSystem::PollLeapInputFromCpp(float DeltaTime)
 			SetLeapInputStatus(TEXT("Leap frame has no hands"));
 		}
 		UpdateHandData(false, RawHandScreenPosition, 0.0f);
-		UpdateLeapTooCloseState(FVector::ZeroVector, false);
+		bLastLeapInputGated = false;
+		LastLeapConfidence = 0.0f;
+		LastLeapVisibleTime = 0.0f;
+		LastLeapHandId = 0;
+		LastRawLeapHandSpeed = 0.0f;
+		UpdateLeapTooCloseState(FVector::ZeroVector, false, DeltaTime);
 		bHasLastCppLeapScreenPosition = false;
 		bLastCppLeapHadSelectedHand = false;
 		return;
@@ -365,24 +409,56 @@ void ATomatinaTowelSystem::PollLeapInputFromCpp(float DeltaTime)
 
 	LastSelectedLeapPalmRawPosition = SelectedHand.Palm.Position;
 	LastSelectedLeapPalmStabilizedPosition = SelectedHand.Palm.StabilizedPosition;
+	LastLeapConfidence = SelectedHand.Confidence;
+	LastLeapVisibleTime = SelectedHand.VisibleTime;
+	LastLeapHandId = SelectedHand.Id;
 
 	const bool bHasStabilizedPosition = !SelectedHand.Palm.StabilizedPosition.IsNearlyZero();
 	const FVector PalmPosition = (bUseStabilizedPalmPosition && bHasStabilizedPosition)
 		? SelectedHand.Palm.StabilizedPosition
 		: SelectedHand.Palm.Position;
 	LastSelectedLeapPalmPosition = PalmPosition;
-	UpdateLeapTooCloseState(PalmPosition, true);
 	const FVector2D ScreenPosition = ConvertLeapPositionToScreen(PalmPosition);
 
 	float Speed = 0.0f;
 	const float SafeDeltaTime = FMath::Max(DeltaTime, KINDA_SMALL_NUMBER);
 	if (bHasLastCppLeapScreenPosition)
 	{
-		// C++ 直接入力では BP 由来の速度がないため、Raw 正規化座標差分から速度を作る。
-		// Clamp/スムージング後では端張り付きや遅延で速度が鈍るので、ここでは未加工座標を使う。
+		// C++入力ではBP由来の速度がない。端で鈍らないようRaw座標差分を使う。
 		Speed = FVector2D::Distance(ScreenPosition, LastCppLeapScreenPosition) / SafeDeltaTime * LeapInputSpeedScale;
 	}
+	LastRawLeapHandSpeed = Speed;
 
+	const float EffectiveMinConfidence = Speed > HighSpeedThreshold
+		? MinConfidence * SpeedConfidenceRelaxFactor
+		: MinConfidence;
+	const bool bGatedByConfidence = SelectedHand.Confidence < EffectiveMinConfidence;
+	const bool bGatedByVisibleTime = SelectedHand.VisibleTime < MinVisibleTime;
+	if (bGatedByConfidence || bGatedByVisibleTime)
+	{
+		UpdateHandData(false, RawHandScreenPosition, 0.0f);
+		bLastLeapInputGated = true;
+		UpdateLeapTooCloseState(FVector::ZeroVector, false, DeltaTime);
+		bHasLastCppLeapScreenPosition = false;
+		bLastCppLeapHadSelectedHand = false;
+		SetLeapInputStatus(TEXT("Leap hand gated by confidence/visible time"));
+
+		if (bDebugLeapInput)
+		{
+			UE_LOG(LogTemp, Verbose,
+				TEXT("[TowelDiag] Leap gated HandId=%d Confidence=%.3f MinConfidence=%.3f VisibleTime=%.3f MinVisibleTime=%.3f Speed=%.2f"),
+				SelectedHand.Id,
+				SelectedHand.Confidence,
+				EffectiveMinConfidence,
+				SelectedHand.VisibleTime,
+				MinVisibleTime,
+				Speed);
+		}
+		return;
+	}
+
+	bLastLeapInputGated = false;
+	UpdateLeapTooCloseState(PalmPosition, true, DeltaTime);
 	LastCppLeapScreenPosition = ScreenPosition;
 	bHasLastCppLeapScreenPosition = true;
 	UpdateHandData(true, ScreenPosition, Speed);
@@ -468,27 +544,59 @@ float ATomatinaTowelSystem::ReadLeapAxis(FVector LeapPosition, ELeapTowelAxis Ax
 	}
 }
 
-void ATomatinaTowelSystem::UpdateLeapTooCloseState(FVector LeapPosition, bool bHasSelectedHand)
+void ATomatinaTowelSystem::UpdateLeapTooCloseState(FVector LeapPosition, bool bHasSelectedHand, float DeltaTime)
 {
 	if (!bEnableLeapTooCloseWarning || !bHasSelectedHand)
 	{
 		bLeapTooCloseToDevice = false;
 		LastLeapDistanceValue = 0.0f;
+		SmoothedPalmHeight = 0.0f;
+		bHasSmoothedPalmHeight = false;
+		CloseEnterTimer = 0.0f;
+		CloseExitTimer = 0.0f;
 		return;
 	}
 
 	LastLeapDistanceValue = ReadLeapAxis(LeapPosition, LeapTooCloseAxis);
-	const float ShowThreshold = LeapTooCloseThreshold;
-	const float ClearThreshold = FMath::Max(LeapTooCloseClearThreshold, ShowThreshold);
-
-	// ヒステリシスを持たせ、閾値付近で警告が点滅しないようにする。
-	if (bLeapTooCloseToDevice)
+	// Ultraleap plugin converts hand positions from mm to UE cm; thresholds are exposed as mm.
+	const float RawPalmHeightMm = LastLeapDistanceValue * 10.0f;
+	const float Alpha = FMath::Clamp(HeightEMAAlpha, 0.0f, 1.0f);
+	if (!bHasSmoothedPalmHeight)
 	{
-		bLeapTooCloseToDevice = LastLeapDistanceValue <= ClearThreshold;
+		bHasSmoothedPalmHeight = true;
+		SmoothedPalmHeight = RawPalmHeightMm;
 	}
 	else
 	{
-		bLeapTooCloseToDevice = LastLeapDistanceValue <= ShowThreshold;
+		SmoothedPalmHeight = FMath::Lerp(SmoothedPalmHeight, RawPalmHeightMm, Alpha);
+	}
+
+	const float EnterThreshold = CloseEnterThresholdMm;
+	const float ExitThreshold = FMath::Max(CloseExitThresholdMm, EnterThreshold);
+	if (!bLeapTooCloseToDevice && SmoothedPalmHeight < EnterThreshold)
+	{
+		CloseEnterTimer += DeltaTime;
+		CloseExitTimer = 0.0f;
+		if (CloseEnterTimer >= CloseEnterDelay)
+		{
+			bLeapTooCloseToDevice = true;
+			CloseEnterTimer = 0.0f;
+		}
+	}
+	else if (bLeapTooCloseToDevice && SmoothedPalmHeight > ExitThreshold)
+	{
+		CloseExitTimer += DeltaTime;
+		CloseEnterTimer = 0.0f;
+		if (CloseExitTimer >= CloseExitDelay)
+		{
+			bLeapTooCloseToDevice = false;
+			CloseExitTimer = 0.0f;
+		}
+	}
+	else
+	{
+		CloseEnterTimer = 0.0f;
+		CloseExitTimer = 0.0f;
 	}
 }
 
@@ -575,15 +683,11 @@ void ATomatinaTowelSystem::ResetHandInputFilter()
 	OneEuroY = FOneEuroAxisState();
 }
 
-// =============================================================================
-// CheckTowelInView
-// =============================================================================
-
 bool ATomatinaTowelSystem::CheckTowelInView(FVector2D TowelNormPos)
 {
 	ATomatinaPlayerPawn* Pawn = GetPlayerPawn();
-	if (!Pawn || !Pawn->bIsZooming)  { return false; }
-	if (!Pawn->SceneCapture_Zoom)    { return false; }
+	if (!Pawn || !Pawn->bIsZooming) { return false; }
+	if (!Pawn->SceneCapture_Zoom) { return false; }
 
 	APlayerController* PC = Pawn->GetController<APlayerController>();
 	if (!PC) { return false; }
@@ -605,10 +709,6 @@ bool ATomatinaTowelSystem::CheckTowelInView(FVector2D TowelNormPos)
 
 	return bInView;
 }
-
-// =============================================================================
-// GetDirtManager（キャッシュ付き）
-// =============================================================================
 
 ATomatoDirtManager* ATomatinaTowelSystem::GetDirtManager()
 {
@@ -635,10 +735,6 @@ ATomatoDirtManager* ATomatinaTowelSystem::GetDirtManager()
 	return CachedDirtManager;
 }
 
-// =============================================================================
-// GetPlayerPawn（キャッシュ付き）
-// =============================================================================
-
 ATomatinaPlayerPawn* ATomatinaTowelSystem::GetPlayerPawn()
 {
 	if (!CachedPlayerPawn)
@@ -660,22 +756,45 @@ ATomatinaPlayerPawn* ATomatinaTowelSystem::GetPlayerPawn()
 	return CachedPlayerPawn;
 }
 
-// =============================================================================
-// UpdateWipeSound — 拭き状態のエッジ検出でループ SE を開始・停止
-// =============================================================================
+void ATomatinaTowelSystem::LogLeapInputFrame(bool bIsWiping) const
+{
+	if (!bDebugLeapInput)
+	{
+		return;
+	}
+
+	UE_LOG(LogTemp, Verbose,
+		TEXT("[TowelDiag] RawPalmPos=(%.2f,%.2f,%.2f) SmoothedPalmHeight=%.2f Confidence=%.3f VisibleTime=%.3f HandId=%d bGated=%d bUsingGraceInput=%d RawHandSpeed=%.2f ProcessedHandSpeed=%.2f bIsWiping=%d bIsTooClose=%d SegmentLength=%.4f SampleCount=%d AmountPerSample=%.4f bGraceJustExited=%d"),
+		LastSelectedLeapPalmRawPosition.X,
+		LastSelectedLeapPalmRawPosition.Y,
+		LastSelectedLeapPalmRawPosition.Z,
+		SmoothedPalmHeight,
+		LastLeapConfidence,
+		LastLeapVisibleTime,
+		LastLeapHandId,
+		bLastLeapInputGated ? 1 : 0,
+		bUsingGraceInput ? 1 : 0,
+		LastRawLeapHandSpeed,
+		ProcessedHandSpeed,
+		bIsWiping ? 1 : 0,
+		bLeapTooCloseToDevice ? 1 : 0,
+		LastWipeSegmentLength,
+		LastWipeSampleCount,
+		LastWipeAmountPerSample,
+		bLastGraceJustExited ? 1 : 0);
+}
 
 void ATomatinaTowelSystem::UpdateWipeSound(bool bIsWiping)
 {
 	if (bIsWiping == bWasWiping)
 	{
-		return; // 状態変化なし
+		return;
 	}
 	bWasWiping = bIsWiping;
 
 	if (bIsWiping)
 	{
 		if (!WipeLoopSound) { return; }
-		// 既に再生中なら何もしない
 		if (WipeAudioComp && WipeAudioComp->IsPlaying())
 		{
 			return;

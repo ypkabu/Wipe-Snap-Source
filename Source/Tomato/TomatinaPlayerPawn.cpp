@@ -66,7 +66,6 @@ void ATomatinaPlayerPawn::BeginPlay()
 		return;
 	}
 
-	// Enhanced Input Mapping Context を登録
 	if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -87,15 +86,12 @@ void ATomatinaPlayerPawn::BeginPlay()
 		}
 	}
 
-	// カーソル表示・GameAndUI モード
 	PC->bShowMouseCursor = true;
 	FInputModeGameAndUI InputMode;
 	InputMode.SetHideCursorDuringCapture(false);
 	PC->SetInputMode(InputMode);
 
-	// ── SceneCapture_Zoom 診断ログ ─────────────────────────────────────
-	//   スマホ側 RT はズーム中と短い猶予時間だけ手動更新する。
-	//   BP で意図せず毎フレーム更新に戻っていないかを可視化する。
+	// スマホ側RTはズーム中と短い猶予時間だけ手動更新する。
 	if (SceneCapture_Zoom)
 	{
 		UTextureRenderTarget2D* RT = SceneCapture_Zoom->TextureTarget;
@@ -188,31 +184,24 @@ void ATomatinaPlayerPawn::Tick(float DeltaTime)
 
 	UpdateDualScreenLayoutRetry(DeltaTime);
 
-	// ── ZoomAlpha の補間（実時間ベース） ───────────────────────────────
 	const float RealDelta = FApp::GetDeltaTime();
 	UpdateZoomInterpolation(RealDelta);
 
 	ATomatinaHUD* HUD = Cast<ATomatinaHUD>(PC->GetHUD());
 
-	// ── ZoomAlpha >= 0.95：カーソルを iPhone 中央に一度だけ飛ばす ──────
 	// 旧スパンウィンドウ方式のときのみ。第二ウィンドウ方式ではスマホ側は独立 SWindow
 	// なので OS カーソルを動かす必要がなく、IMG_PhoneCursor(UMG) で視覚的に示す。
 	CenterLegacySpanCursorWhenZoomReady();
 
-	// ── ZoomAlpha >= 0.99：マウスルック有効化（カーソルは常時表示のまま） ──
 	EnableZoomLookWhenReady();
 
-	// ── ズーム中：マウスルックを SceneCapture_Zoom のローカル回転に適用 ──
 	ApplyZoomLookInput(RealDelta);
 	CurrentLookInput = FVector2D::ZeroVector;
 
-	// ── ズーム中：HUD にカーソル位置を通知（iPhone 側に表示） ────────
 	UpdateZoomHUDCursor(HUD);
 
-	// ── ズーム解除が完了したらリセット ─────────────────────────────
 	ResetZoomViewWhenIdle();
 
-	// ── 非ズーム時：カーソルをメインモニター内に閉じ込める ────────────
 	// ウィンドウは Main + iPhone の横並びなので、右側 iPhone 領域に抜けていた
 	// カーソルを戻す。ズーム中はカーソル非表示 or iPhone 側に飛ばしてるので対象外。
 	ClampMouseCursorToMainScreen();
@@ -350,9 +339,6 @@ void ATomatinaPlayerPawn::ClampMouseCursorToMainScreen()
 	}
 }
 
-// =============================================================================
-// OnRightMousePressed — ズーム開始
-// =============================================================================
 void ATomatinaPlayerPawn::OnRightMousePressed(const FInputActionValue& /*Value*/)
 {
 	if (bDebugPlayerLog)
@@ -401,7 +387,6 @@ void ATomatinaPlayerPawn::OnRightMousePressed(const FInputActionValue& /*Value*/
 	TargetOffset = UTomatinaFunctionLibrary::CalculateZoomOffset(
 		PC, Hit, PlayerCamera, PlayerCamera->FieldOfView);
 
-	// ── 壁/床めり込み防止: カメラ位置→オフセット先をスイープして安全距離にクランプ ──
 	// TargetOffset はカメラローカル座標なのでワールドに変換してからスイープする。
 	ClampZoomTargetOffsetAgainstWorld();
 
@@ -420,7 +405,6 @@ void ATomatinaPlayerPawn::OnRightMousePressed(const FInputActionValue& /*Value*/
 		HUD->ShowCursor();
 	}
 
-	// ズーム開始 SE
 	UTomatinaFunctionLibrary::PlayTomatinaCue2D(this, ZoomInSound);
 
 	if (bDebugPlayerLog)
@@ -486,9 +470,6 @@ void ATomatinaPlayerPawn::ApplyZoomNearClipGuard()
 	}
 }
 
-// =============================================================================
-// OnRightMouseReleased — ズーム解除（逆再生）
-// =============================================================================
 void ATomatinaPlayerPawn::OnRightMouseReleased(const FInputActionValue& /*Value*/)
 {
 	if (bDebugPlayerLog)
@@ -510,9 +491,6 @@ void ATomatinaPlayerPawn::OnRightMouseReleased(const FInputActionValue& /*Value*
 	EndZoomInteraction();
 }
 
-// =============================================================================
-// OnLeftMousePressed — 撮影（ズーム中のみ）
-// =============================================================================
 void ATomatinaPlayerPawn::OnLeftMousePressed(const FInputActionValue& /*Value*/)
 {
 	if (bDebugPlayerLog)
@@ -536,7 +514,6 @@ void ATomatinaPlayerPawn::OnLeftMousePressed(const FInputActionValue& /*Value*/)
 		UE_LOG(LogTemp, Error, TEXT("OnLeftMousePressed: GameMode 取得失敗"));
 	}
 
-	// ── 撮影直後：ズーム解除（カーソル位置は Tick のクランプ処理に任せる） ─
 	bIsZooming      = false;
 	bZoomComplete   = false;
 	bCursorCentered = false;
@@ -561,9 +538,6 @@ void ATomatinaPlayerPawn::EndZoomInteraction()
 	}
 }
 
-// =============================================================================
-// OnLook — マウス移動を蓄積
-// =============================================================================
 void ATomatinaPlayerPawn::OnLook(const FInputActionValue& Value)
 {
 	CurrentLookInput += Value.Get<FVector2D>();
