@@ -1,30 +1,23 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "TomatoDirtManager.h"
 #include "TomatinaHUD.h"
 #include "GameFramework/PlayerController.h"
 
-// ─────────────────────────────────────────────────────────────────────────────
 ATomatoDirtManager::ATomatoDirtManager()
 {
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 最初のスポーンまでの時間を初期化
 	SpawnTimer = SpawnInterval;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// ── 汚れスポーンタイマー（bEnableAutoSpawn が true のときだけ動く） ──
 	if (bEnableAutoSpawn)
 	{
 		SpawnTimer -= DeltaTime;
@@ -35,7 +28,6 @@ void ATomatoDirtManager::Tick(float DeltaTime)
 		}
 	}
 
-	// ── 自然減衰 ─────────────────────────────────────────────────────────
 	bool bDecayChanged = false;
 	for (FDirtSplat& Dirt : DirtSplats)
 	{
@@ -53,7 +45,6 @@ void ATomatoDirtManager::Tick(float DeltaTime)
 		}
 	}
 
-	// ── 非アクティブなものを一括削除 ─────────────────────────────────────
 	DirtSplats.RemoveAll([](const FDirtSplat& D) { return !D.bActive; });
 
 	if (bDecayChanged)
@@ -62,10 +53,8 @@ void ATomatoDirtManager::Tick(float DeltaTime)
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::SpawnDirt()
 {
-	// MaxDirts に達していれば生成しない
 	if (DirtSplats.Num() >= MaxDirts)
 	{
 		if (bDebugDirtLog)
@@ -75,7 +64,7 @@ void ATomatoDirtManager::SpawnDirt()
 		return;
 	}
 
-	// SpawnRangeMin / SpawnRangeMax は 0〜1 の正規化範囲。メイン画面内の一部領域に限定可能
+	// SpawnRangeMin / SpawnRangeMax は0〜1の正規化範囲。メイン画面内の一部領域に限定可能。
 	const float MinX = FMath::Min(SpawnRangeMin.X, SpawnRangeMax.X);
 	const float MaxX = FMath::Max(SpawnRangeMin.X, SpawnRangeMax.X);
 	const float MinY = FMath::Min(SpawnRangeMin.Y, SpawnRangeMax.Y);
@@ -102,16 +91,13 @@ void ATomatoDirtManager::SpawnDirt()
 	NotifyHUD();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::AddDirt(FVector2D NormPos, float Size)
 {
 	AddDirtWithType(NormPos, Size, EDirtType::NormalRed);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::AddDirtWithType(FVector2D NormPos, float Size, EDirtType InDirtType, int32 InRequiredDashCount, int32 InTextureIndex)
 {
-	// MaxDirts に達していたら追加しない（既存の汚れは消さない）
 	if (DirtSplats.Num() >= MaxDirts)
 	{
 		if (bDebugDirtLog)
@@ -200,7 +186,6 @@ int32 ATomatoDirtManager::ResolveDirtTextureIndex(EDirtType DirtType, int32 InTe
 	return (NumDirtVariants > 1) ? FMath::RandRange(0, NumDirtVariants - 1) : 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::ClearDirtAt(FVector2D NormPos, float Radius)
 {
 	const float RadiusSq = Radius * Radius;
@@ -230,14 +215,12 @@ void ATomatoDirtManager::ClearDirtAt(FVector2D NormPos, float Radius)
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 float ATomatoDirtManager::GetSecondsSinceLastWipe() const
 {
 	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.f;
 	return Now - LastWipeRealTime;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::ClearAllDirts()
 {
 	const int32 PrevCount = DirtSplats.Num();
@@ -249,7 +232,6 @@ void ATomatoDirtManager::ClearAllDirts()
 	NotifyHUD();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::WipeDirtAt(FVector2D NormPos, float Radius, float Amount)
 {
 	bool bAnyChanged = false;
@@ -287,7 +269,7 @@ void ATomatoDirtManager::WipeDirtAt(FVector2D NormPos, float Radius, float Amoun
 
 	DirtSplats.RemoveAll([](const FDirtSplat& D) { return !D.bActive; });
 
-	// 変化があれば毎フレーム HUD を更新（透明度がスムーズに下がって見える）
+	// 透明度の変化を滑らかに見せるため、変化があったフレームだけHUDへ反映する。
 	if (bAnyChanged)
 	{
 		NotifyHUD();
@@ -350,7 +332,6 @@ bool ATomatoDirtManager::ResetStickyDashIfExpired(FDirtSplat& Dirt, float NowRea
 	return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 TArray<FDirtSplat> ATomatoDirtManager::GetActiveDirts() const
 {
 	TArray<FDirtSplat> Result;
@@ -364,7 +345,6 @@ TArray<FDirtSplat> ATomatoDirtManager::GetActiveDirts() const
 	return Result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void ATomatoDirtManager::NotifyHUD()
 {
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())

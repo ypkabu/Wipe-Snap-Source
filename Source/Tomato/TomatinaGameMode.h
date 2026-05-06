@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -18,74 +16,54 @@ class ATomatinaHUD;
 class ATomatoDirtManager;
 class ATomatinaTowelSystem;
 
-// -----------------------------------------------------------------------------
-// FMissionData — 1 ミッション分の設定
-// -----------------------------------------------------------------------------
 USTRUCT(BlueprintType)
 struct FMissionData
 {
 	GENERATED_BODY()
 
-	/** お題タグ。ATomatinaTargetBase::MyType と照合 */
 	UPROPERTY(EditAnywhere)
 	FName TargetType;
 
-	/** お題テキスト（例：「ゴリラを撮れ！」） */
 	UPROPERTY(EditAnywhere)
 	FText DisplayText;
 
-	/** 制限時間（秒）。0 以下なら無制限 */
+	// 0以下なら無制限。
 	UPROPERTY(EditAnywhere)
 	float TimeLimit = 15.0f;
 
-	/** スポーンするターゲット BP クラス。
-	 *  TargetClassVariants が空のときのフォールバックとして使用される。
-	 *  単一の BP しか使わないミッションなら従来通りここだけ埋めれば OK。 */
+	// TargetClassVariantsが空のときのフォールバック。
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<ATomatinaTargetBase> TargetClass;
 
-	/** ターゲットクラスのランダム候補リスト。
-	 *  空でなければ、SpawnCount 体それぞれについて **毎回ランダムに 1 つ** 選んでスポーンする。
-	 *  空なら TargetClass を使用（従来挙動）。
-	 *  例: [BP_Target_Gorilla, BP_Target_Chicken, BP_Target_UFOguy] を入れて
-	 *      「変な人コンテスト」ミッションを作る等。 */
+	// 空でなければ、SpawnCount体それぞれにランダム候補を使う。
 	UPROPERTY(EditAnywhere)
 	TArray<TSubclassOf<ATomatinaTargetBase>> TargetClassVariants;
 
-	/** 同時スポーン数 */
 	UPROPERTY(EditAnywhere)
 	int32 SpawnCount = 1;
 
-	/** ATomatinaTargetSpawner::SpawnProfiles から検索するプロファイル名 */
 	UPROPERTY(EditAnywhere)
 	FName SpawnProfileName;
 
-	/** ターゲットのプレビュー画像（HUD の IMG_TargetPreview に表示） */
 	UPROPERTY(EditAnywhere)
 	UTexture2D* TargetImage = nullptr;
 };
 
-// -----------------------------------------------------------------------------
-// FFanfareTier — スコア閾値ごとのファンファーレ SE
-// -----------------------------------------------------------------------------
 USTRUCT(BlueprintType)
 struct FFanfareTier
 {
 	GENERATED_BODY()
 
-	/** このスコア以上なら Sound を採用（降順で評価され、最も高い閾値が勝つ） */
+	// 条件を満たす中で一番高いMinScoreを使う。
 	UPROPERTY(EditAnywhere)
 	int32 MinScore = 0;
 
-	/** 再生するファンファーレ SE */
 	UPROPERTY(EditAnywhere)
 	USoundBase* Sound = nullptr;
 
-	/** 音量倍率 */
 	UPROPERTY(EditAnywhere, meta=(ClampMin="0.0", ClampMax="4.0"))
 	float VolumeMultiplier = 1.0f;
 
-	/** ピッチ倍率 */
 	UPROPERTY(EditAnywhere, meta=(ClampMin="0.1", ClampMax="4.0"))
 	float PitchMultiplier = 1.0f;
 };
@@ -111,7 +89,6 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
-	// ── ミッション一覧 ───────────────────────────────────────
 	UPROPERTY(EditAnywhere, Category="Tomatina|Mission")
 	TArray<FMissionData> Missions;
 
@@ -124,14 +101,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|Mission")
 	FName CurrentMission;
 
-	// ── スコア ───────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|Score")
 	int32 CurrentScore = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|Score")
 	int32 TotalScore = 0;
 
-	// ── レンダーターゲット・音 ──────────────────────────────
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Photo")
 	UTextureRenderTarget2D* RT_Photo = nullptr;
 
@@ -141,71 +116,59 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio")
 	USoundBase* BGM = nullptr;
 
-	/** 観客ざわめき（ゲームプレイ中ループ再生。BeginPlay で開始、最終リザルトで停止） */
+	// ゲームプレイ中の観客ループ。最終リザルト前に停止する。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio")
 	USoundBase* CrowdAmbient = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio", meta=(ClampMin="0.0", ClampMax="4.0"))
 	float CrowdAmbientVolume = 1.0f;
 
-	/** 撮影後のファンファーレ（写真スコア別）。MinScore 降順で最初に一致したものを再生 */
+	// 写真スコア別のファンファーレ。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio")
 	TArray<FFanfareTier> FanfareTiers;
 
-	// ── 追加 SE（すべて任意設定。未設定なら無音） ────────────────
-	/** カウントダウン各秒（3, 2, 1）の 1 秒刻みで鳴らす SE */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Countdown")
 	FTomatinaSoundCue CountdownTickSound;
 
-	/** カウントダウン 0 秒の瞬間（スタート！）SE */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Countdown")
 	FTomatinaSoundCue CountdownGoSound;
 
-	/** ミッション開始時 SE */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Mission")
 	FTomatinaSoundCue MissionStartSound;
 
-	/** 時間切れ SE */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Mission")
 	FTomatinaSoundCue TimeUpSound;
 
-	/** 最終リザルト溜め開始時 SE（ジャン！系推奨） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Result")
 	FTomatinaSoundCue FinalBuildupSound;
 
-	/** 最終リザルト（スコア）画面が表示された瞬間の SE（ファンファーレ・発表系推奨） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Audio|Result")
 	FTomatinaSoundCue FinalResultRevealSound;
 
-	// ── リザルト表示時間 ──────────────────────────────────────
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Result")
 	float ResultDisplayTime = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Result")
 	float MissionResultDisplayTime = 2.0f;
 
-	/** 最終リザルト表示前の「溜め」時間（秒）。この間 BGM 以外の音停止・汚れ全削除 */
+	// 最終リザルト前の溜め。BGM以外の音停止と汚れ全削除を行う。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Result", meta=(ClampMin="0.0", ClampMax="10.0"))
 	float FinalResultBuildupTime = 1.5f;
 
-	// ── ゲーム全体の制限時間 ─────────────────────────────────
-	/** ゲーム全体の制限時間（秒）を手動で上書き。0 以下なら Missions[].TimeLimit の合計を自動使用 */
+	// 0以下ならMissions[].TimeLimitの合計を使う。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|GameTime")
 	float GameTimeOverride = 0.f;
 
-	/** ゲーム全体の残り時間（BP から参照可） */
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|GameTime")
 	float GameTimeRemaining = 0.f;
 
-	/** ゲーム全体の総制限時間（計算後の値） */
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|GameTime")
 	float GameTimeTotal = 0.f;
 
-	/** 撮影写真に写り込んだ汚れ 1 個あたりの減点量（負の値を推奨） */
+	// 汚れ1個あたりの減点。負の値を想定。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Score")
 	int32 DirtPenaltyPerSplat = -5;
 
-	// ── スタイリッシュランク ───────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|Stylish")
 	EStylishRank StylishRank = EStylishRank::C;
 
@@ -218,55 +181,46 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|Stylish")
 	float DirtCoverage01 = 0.0f;
 
-	/** スタイリッシュゲージの上限 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishGaugeMax = 100.0f;
 
-	/** 基本減衰量（毎秒） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishBaseDecayPerSecond = 3.0f;
 
-	/** 汚れがこの割合を超えると減衰強化 */
+	// 汚れが増えるほどランク維持が難しくなる。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float StylishDirtDangerThreshold = 0.72f;
 
-	/** 汚れがこの割合を超えると大幅減衰 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float StylishDirtCriticalThreshold = 0.92f;
 
-	/** Danger 閾値超過時の追加減衰（毎秒） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishDirtDangerDecayPerSecond = 12.0f;
 
-	/** Critical 閾値超過時の追加減衰（毎秒） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishDirtCriticalDecayPerSecond = 32.0f;
 
-	/** この点数以上の写真を「高得点」とみなしてコンボ対象にする */
+	// この点数以上をテンポコンボ対象にする。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	int32 StylishGoodShotThreshold = 60;
 
-	/** 高得点写真の連続扱いになる最大間隔（秒） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishTempoWindow = 4.0f;
 
-	/** 写真スコア→ゲージ加算の係数（100点で +20 なら 0.2） */
+	// 写真スコアからゲージ加算量への係数。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishScoreToGaugeScale = 0.22f;
 
-	/** 高得点連続のテンポボーナス加算値 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishTempoBonusGauge = 10.0f;
 
-	/** 撮影失敗時のゲージ減少量 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishMissPenalty = 15.0f;
 
-	/** 失敗時にコンボをリセットするか */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	bool bResetComboOnMiss = true;
 
-	/** B/A/S/SSS への昇格閾値（C は 0） */
+	// Cは0。以降はゲージ値でランクを決める。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishThresholdB = 20.0f;
 
@@ -279,25 +233,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	float StylishThresholdSSS = 90.0f;
 
-	/** このランク以上を「高ランク状態」とみなし、ターゲット演出を解放 */
+	// このランク以上でターゲット側の追加演出を解放。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stylish")
 	EStylishRank HiddenActionMinRank = EStylishRank::S;
 
-	/** スタイリッシュランク変化時の BP フック */
 	UFUNCTION(BlueprintImplementableEvent, Category="Tomatina|Stylish")
 	void OnStylishRankChanged(EStylishRank NewRank, EStylishRank OldRank, bool bRankUp);
 
-	/** 高ランク状態での撮影成功時フック（演出・SE 用） */
 	UFUNCTION(BlueprintImplementableEvent, Category="Tomatina|Stylish")
 	void OnHighStylishShot(ATomatinaTargetBase* Target, EStylishRank Rank, int32 ShotScore);
 
-	// ── ロード演出 ────────────────────────────────────────────
-	/** ロード画面を最低限保持する秒数。Spawner 等の準備完了に加えて、この時間が経過してからカウントダウンへ移る */
+	// Spawnerなどの準備完了に加えて、この時間だけロード表示を保つ。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Loading", meta=(ClampMin="0.0", ClampMax="10.0"))
 	float LoadingHoldSeconds = 1.2f;
 
-	// ── 内部状態 ──────────────────────────────────────────────
-	/** ロード中（カウントダウン前の「ロード中...」表示中） */
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|State")
 	bool bIsLoading = false;
 
@@ -310,14 +259,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|State")
 	bool bIsShowingMissionResult = false;
 
-	/** 最終リザルトの溜め中（画面暗転・音停止・汚れ消去） */
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|State")
 	bool bIsBuildingUpFinalResult = false;
 
 	UPROPERTY(BlueprintReadOnly, Category="Tomatina|State")
 	float RemainingTime = -1.f;
 
-	// ── 撮影（PlayerPawn から呼ばれる） ────────────────────────
 	UFUNCTION(BlueprintCallable, Category="Tomatina|Photo")
 	void TakePhoto(USceneCaptureComponent2D* ZoomCamera);
 
@@ -325,23 +272,19 @@ public:
 	void StartMission(int32 Index);
 
 private:
-	// ── 画面サイズ（PlayerPawn から取得してキャッシュ） ────────
+	// PlayerPawnから取得してキャッシュする画面サイズ。
 	float MainWidth   = 2560.f;
 	float MainHeight  = 1600.f;
 	float PhoneWidth  = 2024.f;
 	float PhoneHeight = 1152.f;
 
-	// ── カウントダウン ───────────────────────────────────────
 	float CountdownRemaining = 0.f;
 	int32 LastCountdownSecond = -1;
 
-	// ── ロード ───────────────────────────────────────────────
 	float LoadingElapsed = 0.f;
 
-	/** ロード完了判定。必要アクターが全部揃っていて最低保持秒数を満たしたら true */
 	bool IsLoadingComplete() const;
 
-	/** ロード→カウントダウンへの遷移処理 */
 	void BeginCountdownAfterLoading();
 	bool TickLoading(float RealDelta);
 	bool TickCountdown(float RealDelta);
@@ -351,22 +294,21 @@ private:
 	bool TickFinalResultBuildup(float RealDelta);
 	void TickMissionTimer(float DeltaSeconds);
 
-	// ── リザルト計時（FApp::GetDeltaTime 累積） ──────────────
+	// FApp::GetDeltaTimeで進めるリザルト用タイマー。
 	float ResultElapsed = 0.f;
 	float MissionResultElapsed = 0.f;
 	float FinalBuildupElapsed = 0.f;
 
-	/** 直前の撮影が成功したか（true なら次ミッションへ、false なら同ミッション継続） */
+	// falseなら同じミッションを続ける。
 	bool bLastPhotoSucceeded = false;
 
 	UPROPERTY()
 	ATomatinaTargetSpawner* TargetSpawner = nullptr;
 
-	/** BGM 再生用の AudioComponent。StopAllSoundsExceptBGM で判別に使う */
+	// StopAllSoundsExceptBGMで残すために保持。
 	UPROPERTY()
 	UAudioComponent* BGMAudioComp = nullptr;
 
-	/** 観客ざわめき再生用の AudioComponent */
 	UPROPERTY()
 	UAudioComponent* CrowdAudioComp = nullptr;
 
@@ -390,33 +332,26 @@ private:
 
 	float LastHighScoreShotTime = -1000.f;
 
-	// =========================================================================
-	// リザルト統計 (最終結果画面に表示する「平均アクションランク」と「1P2P シンクロ率」)
-	// =========================================================================
-
-	/** 撮影時点のスタイリッシュランクの累計 (float 集計 → 平均) */
+	// 最終結果画面用の平均ランク・1P2Pシンクロ率。
 	float StylishRankSum = 0.f;
 
-	/** 撮影ごとのサンプル数 */
 	int32 StylishRankSampleCount = 0;
 
-	/** 撮影試行の総数 (シンクロ率の分母) */
 	int32 TotalPhotoAttempts = 0;
 
-	/** 1P 撮影時に 2P が直近で活動していた回数 (シンクロ率の分子) */
 	int32 SyncPhotoCount = 0;
 
 public:
-	/** シンクロ判定の猶予時間 (秒)。撮影時刻から過去これだけの間に 2P が拭いていれば同期扱い */
+	// 撮影直前に2Pが拭いていれば同期扱いにする猶予。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tomatina|Stats")
 	float SyncWindowSeconds = 2.0f;
 
 private:
-	/** レベルにタオルシステムがない場合に C++ 側で自動生成する。 */
+	// レベルにタオルシステムがない場合の保険。
 	UPROPERTY(EditAnywhere, Category="Tomatina|Towel")
 	bool bEnsureTowelSystemExists = true;
 
-	/** 自動生成するタオルシステム。BP派生を使う場合は GameMode Details で設定。 */
+	// BP派生を使う場合はGameMode Detailsで設定する。
 	UPROPERTY(EditAnywhere, Category="Tomatina|Towel", meta=(EditCondition="bEnsureTowelSystemExists"))
 	TSubclassOf<ATomatinaTowelSystem> TowelSystemClass;
 
