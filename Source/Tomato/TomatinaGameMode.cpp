@@ -219,11 +219,44 @@ bool ATomatinaGameMode::TickCountdown(float RealDelta)
 			HUD->HideCountdown();
 			HUD->UpdateGameTimer(GameTimeRemaining, GameTimeTotal);
 		}
+		ForceTowelToCenterAfterCountdown();
 		UTomatinaFunctionLibrary::PlayTomatinaCue2D(this, CountdownGoSound);
 		StartMission(0);
 	}
 
 	return true;
+}
+
+void ATomatinaGameMode::ForceTowelToCenterAfterCountdown()
+{
+	const FVector2D CenterPosition(0.5f, 0.5f);
+	bool bForcedAnyTowelSystem = false;
+
+	if (GetWorld())
+	{
+		TArray<AActor*> TowelActors;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATomatinaTowelSystem::StaticClass(), TowelActors);
+		for (AActor* Actor : TowelActors)
+		{
+			if (ATomatinaTowelSystem* TowelSystem = Cast<ATomatinaTowelSystem>(Actor))
+			{
+				TowelSystem->ForceTowelToCenterAfterCountdown();
+				CachedTowelSystem = TowelSystem;
+				bForcedAnyTowelSystem = true;
+			}
+		}
+	}
+
+	if (!bForcedAnyTowelSystem && CachedTowelSystem)
+	{
+		CachedTowelSystem->ForceTowelToCenterAfterCountdown();
+	}
+
+	if (ATomatinaHUD* HUD = GetTomatinaHUD())
+	{
+		HUD->UpdateTowelPosition(CenterPosition);
+		HUD->ShowTowel();
+	}
 }
 
 bool ATomatinaGameMode::TickGameTime(float DeltaSeconds)

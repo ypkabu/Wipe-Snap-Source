@@ -667,15 +667,42 @@ void ATomatinaHUD::UpdateTowelPosition(FVector2D Pos)
 	UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Towel->Slot);
 	if (!Slot) { return; }
 
-	const FVector2D OverlaySize = DirtOverlayWidget->GetCachedGeometry().GetLocalSize();
-	const float AreaWidth = (OverlaySize.X > 1.f) ? OverlaySize.X : MainWidth;
-	const float AreaHeight = (OverlaySize.Y > 1.f) ? OverlaySize.Y : MainHeight;
+	FVector2D TargetLocalPosition = FVector2D::ZeroVector;
+	bool bHasTargetLocalPosition = false;
+	const FVector2D VisualPos(
+		FMath::Clamp(Pos.X + TowelVisualCenterOffset.X, 0.0f, 1.0f),
+		FMath::Clamp(Pos.Y + TowelVisualCenterOffset.Y, 0.0f, 1.0f));
+
+	if (UCanvasPanel* ParentCanvas = Cast<UCanvasPanel>(Towel->GetParent()))
+	{
+		const FGeometry ParentGeometry = ParentCanvas->GetCachedGeometry();
+		const FGeometry ViewportGeometry = UWidgetLayoutLibrary::GetViewportWidgetGeometry(this);
+		const FVector2D ViewportSize = ViewportGeometry.GetLocalSize();
+		if (ParentGeometry.GetLocalSize().X > 1.f && ParentGeometry.GetLocalSize().Y > 1.f &&
+			ViewportSize.X > 1.f && ViewportSize.Y > 1.f)
+		{
+			const FVector2D TargetAbsolutePosition = ViewportGeometry.LocalToAbsolute(
+				FVector2D(VisualPos.X * ViewportSize.X, VisualPos.Y * ViewportSize.Y));
+			TargetLocalPosition = ParentGeometry.AbsoluteToLocal(TargetAbsolutePosition);
+			bHasTargetLocalPosition = true;
+		}
+	}
+
+	if (!bHasTargetLocalPosition)
+	{
+		const FVector2D OverlaySize = DirtOverlayWidget->GetCachedGeometry().GetLocalSize();
+		const float AreaWidth = (OverlaySize.X > 1.f) ? OverlaySize.X : MainWidth;
+		const float AreaHeight = (OverlaySize.Y > 1.f) ? OverlaySize.Y : MainHeight;
+		TargetLocalPosition = FVector2D(VisualPos.X * AreaWidth, VisualPos.Y * AreaHeight);
+	}
 
 	// UMG側のAnchor設定に左右されるとLeap座標とタオル表示がずれるため、
 	// C++側で左上基準Anchor + 中央Alignmentに統一して、正規化座標をそのまま中心位置に使う。
+	Towel->SetRenderTranslation(FVector2D::ZeroVector);
+	Towel->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 	Slot->SetAnchors(FAnchors(0.f, 0.f));
 	Slot->SetAlignment(FVector2D(0.5f, 0.5f));
-	Slot->SetPosition(FVector2D(Pos.X * AreaWidth, Pos.Y * AreaHeight));
+	Slot->SetPosition(TargetLocalPosition);
 }
 
 void ATomatinaHUD::ShowTowel()

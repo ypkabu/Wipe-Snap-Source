@@ -136,6 +136,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="HUD|Towel")
 	void UpdateTowelPosition(FVector2D Pos);
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="HUD|Towel")
+	FVector2D TowelVisualCenterOffset = FVector2D(-0.13f, -0.11f);
+
 	UFUNCTION(BlueprintCallable, Category="HUD|Towel")
 	void ShowTowel();
 

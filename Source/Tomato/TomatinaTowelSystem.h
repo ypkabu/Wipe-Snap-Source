@@ -89,6 +89,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Towel")
 	void UpdateHandData(bool bDetected, FVector2D ScreenPosition, float Speed);
 
+	// カウントダウン中に拾った入力やWidget初期値を捨て、開始直後は中央に戻す。
+	void ForceTowelToCenterAfterCountdown(float HoldSeconds = 1.5f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|C++ Input")
 	bool bReadLeapInputInCpp = true;
 
@@ -365,6 +368,9 @@ private:
 	bool bWasUsingGraceInput = false;
 	bool bWarnedMissingDirtManager = false;
 	bool bWarnedMissingPlayerPawn = false;
+	bool bPendingStartupCenterCalibration = false;
+	bool bHasStartupScreenOffset = false;
+	float ForceCenterRemainingTime = 0.0f;
 	float LastValidInputTime = -1000.0f;
 	float LastValidHandSpeed = 0.0f;
 	float CloseEnterTimer = 0.0f;
@@ -373,11 +379,12 @@ private:
 	float LastLeapVisibleTime = 0.0f;
 	float LastRawLeapHandSpeed = 0.0f;
 	int32 LastLeapHandId = 0;
-	FVector2D PrevClampedHandScreenPosition = FVector2D(-1.0f, -1.0f);
+	FVector2D PrevClampedHandScreenPosition = FVector2D(0.5f, 0.5f);
 	FVector2D LastValidRawHandScreenPosition = FVector2D(0.5f, 0.5f);
 	FVector2D LastValidSmoothedHandScreenPosition = FVector2D(0.5f, 0.5f);
 	FVector2D LastValidClampedHandScreenPosition = FVector2D(0.5f, 0.5f);
 	FVector2D LastCppLeapScreenPosition = FVector2D(0.5f, 0.5f);
+	FVector2D StartupScreenOffset = FVector2D::ZeroVector;
 
 	struct FOneEuroAxisState
 	{
@@ -397,6 +404,7 @@ private:
 	FVector2D ConvertLeapPositionToScreen(FVector LeapPosition) const;
 	float ReadLeapAxis(FVector LeapPosition, ELeapTowelAxis Axis) const;
 	void UpdateLeapTooCloseState(FVector LeapPosition, bool bHasSelectedHand, float DeltaTime);
+	void ResetHandInputStateToCenter();
 	float GetDurabilityPercent() const;
 	void UpdateTowelHUDStatus(ATomatinaHUD* HUD) const;
 	void HideTowelVisual(ATomatinaHUD* HUD);

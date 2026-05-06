@@ -29,23 +29,110 @@ void ATomatinaTowelSystem::BeginPlay()
 	Super::BeginPlay();
 
 	CurrentDurability = MaxDurability;
+	ResetHandInputStateToCenter();
 
 	SetLeapInputStatus(bReadLeapInputInCpp ? TEXT("Waiting for Leap frame") : TEXT("C++ Leap input disabled"));
 
 	if (bDebugLeapInput)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("[TowelDiag] BeginPlay LeapCppInput=%d Durability=%.1f MinSpeedToWipe=%.2f WipeRadius=%.3f"),
+			TEXT("[TowelDiag] BeginPlay LeapCppInput=%d Durability=%.1f MinSpeedToWipe=%.2f WipeRadius=%.3f InitialPos=(%.3f,%.3f)"),
 			bReadLeapInputInCpp ? 1 : 0,
-			CurrentDurability, MinSpeedToWipe, WipeRadius);
+			CurrentDurability, MinSpeedToWipe, WipeRadius,
+			HandScreenPosition.X, HandScreenPosition.Y);
+	}
+}
+
+void ATomatinaTowelSystem::ResetHandInputStateToCenter()
+{
+	const FVector2D CenterPosition(0.5f, 0.5f);
+	bHandDetected = false;
+	bHasValidInput = false;
+	bUsingGraceInput = false;
+	RawHandScreenPosition = CenterPosition;
+	SmoothedHandScreenPosition = CenterPosition;
+	ClampedHandScreenPosition = CenterPosition;
+	HandScreenPosition = CenterPosition;
+	LastValidRawHandScreenPosition = CenterPosition;
+	LastValidSmoothedHandScreenPosition = CenterPosition;
+	LastValidClampedHandScreenPosition = CenterPosition;
+	LastCppLeapScreenPosition = CenterPosition;
+	PrevClampedHandScreenPosition = CenterPosition;
+	LastWipePosition = CenterPosition;
+	HandSpeed = 0.0f;
+	ProcessedHandSpeed = 0.0f;
+	LastValidInputTime = -1000.0f;
+	LastValidHandSpeed = 0.0f;
+	bHasEverValidInput = false;
+	bHasSmoothedHandPosition = false;
+	bHasLastCppLeapScreenPosition = false;
+	bHasPrevWipePosition = false;
+	bWasUsingGraceInput = false;
+	bPendingStartupCenterCalibration = false;
+	bHasStartupScreenOffset = false;
+	StartupScreenOffset = FVector2D::ZeroVector;
+	bLastGraceJustExited = false;
+	bWipeAttemptedThisFrame = false;
+	bWipeHadDirtManagerThisFrame = false;
+	LastWipeAmount = 0.0f;
+	LastAdjustedWipeRadius = 0.0f;
+	LastWipeSegmentLength = 0.0f;
+	LastWipeSampleCount = 0;
+	LastWipeAmountPerSample = 0.0f;
+	ResetHandInputFilter();
+}
+
+void ATomatinaTowelSystem::ForceTowelToCenterAfterCountdown(float HoldSeconds)
+{
+	ResetHandInputStateToCenter();
+	ForceCenterRemainingTime = FMath::Max(0.0f, HoldSeconds);
+	bPendingStartupCenterCalibration = true;
+	bHasStartupScreenOffset = false;
+	StartupScreenOffset = FVector2D::ZeroVector;
+	bTowelVisible = true;
+	bTowelInZoomView = false;
+	UpdateWipeSound(false);
+
+	APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	ATomatinaHUD* HUD = PC ? Cast<ATomatinaHUD>(PC->GetHUD()) : nullptr;
+	if (HUD)
+	{
+		HUD->UpdateTowelPosition(HandScreenPosition);
+		HUD->ShowTowel();
+		bTowelShownOnHUD = true;
+		UpdateTowelHUDStatus(HUD);
+	}
+
+	if (bDebugLeapInput)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[TowelDiag] Force center after countdown Pos=(%.3f,%.3f) Hold=%.2f"),
+			HandScreenPosition.X, HandScreenPosition.Y, ForceCenterRemainingTime);
 	}
 }
 
 void ATomatinaTowelSystem::UpdateHandData(bool bDetected, FVector2D ScreenPosition, float Speed)
 {
+	FVector2D AdjustedScreenPosition = ScreenPosition;
+	if (bDetected)
+	{
+		const FVector2D ClampedInputPosition = ClampNormalizedHandPosition(ScreenPosition);
+		if (bPendingStartupCenterCalibration)
+		{
+			StartupScreenOffset = FVector2D(0.5f, 0.5f) - ClampedInputPosition;
+			bHasStartupScreenOffset = true;
+			bPendingStartupCenterCalibration = false;
+		}
+
+		if (bHasStartupScreenOffset)
+		{
+			AdjustedScreenPosition = ScreenPosition + StartupScreenOffset;
+		}
+	}
+
 	bHandDetected         = bDetected;
-	RawHandScreenPosition = ScreenPosition;
-	ClampedHandScreenPosition = ClampNormalizedHandPosition(ScreenPosition);
+	RawHandScreenPosition = AdjustedScreenPosition;
+	ClampedHandScreenPosition = ClampNormalizedHandPosition(AdjustedScreenPosition);
 	HandScreenPosition = ClampedHandScreenPosition;
 	HandSpeed             = FMath::Max(0.0f, Speed);
 
@@ -56,7 +143,7 @@ void ATomatinaTowelSystem::UpdateHandData(bool bDetected, FVector2D ScreenPositi
 		UE_LOG(LogTemp, Warning,
 			TEXT("[TowelDiag] UpdateHandData Detected=%d Raw=(%.3f,%.3f) Speed=%.2f"),
 			bDetected ? 1 : 0,
-			ScreenPosition.X, ScreenPosition.Y,
+			AdjustedScreenPosition.X, AdjustedScreenPosition.Y,
 			Speed);
 	}
 }
@@ -127,6 +214,25 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 	if (HUD)
 	{
 		HUD->UpdateLeapDistanceWarning(bEnableLeapTooCloseWarning && bLeapTooCloseToDevice);
+	}
+
+	if (ForceCenterRemainingTime > 0.0f)
+	{
+		const float CenterDeltaTime = FMath::Max(FApp::GetDeltaTime(), DeltaTime);
+		ForceCenterRemainingTime = FMath::Max(0.0f, ForceCenterRemainingTime - CenterDeltaTime);
+		const FVector2D CenterPosition(0.5f, 0.5f);
+		bTowelVisible = true;
+		bTowelInZoomView = false;
+		UpdateWipeSound(false);
+		if (HUD)
+		{
+			HUD->UpdateTowelPosition(CenterPosition);
+			HUD->ShowTowel();
+			bTowelShownOnHUD = true;
+			UpdateTowelHUDStatus(HUD);
+		}
+		LogLeapInputFrame(false);
+		return;
 	}
 
 	const float NowSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
@@ -200,7 +306,7 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 		else
 		{
 			bHasPrevWipePosition = false;
-			PrevClampedHandScreenPosition = FVector2D(-1.0f, -1.0f);
+			PrevClampedHandScreenPosition = FVector2D(0.5f, 0.5f);
 		}
 		bWasUsingGraceInput = bUsingGraceInput;
 		LogLeapInputFrame(false);
@@ -214,11 +320,31 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 		ProcessedHandSpeed = 0.0f;
 		ResetHandInputFilter();
 		bHasPrevWipePosition = false;
-		PrevClampedHandScreenPosition = FVector2D(-1.0f, -1.0f);
+		PrevClampedHandScreenPosition = FVector2D(0.5f, 0.5f);
+		if (!bHasEverValidInput)
+		{
+			const FVector2D CenterPosition(0.5f, 0.5f);
+			RawHandScreenPosition = CenterPosition;
+			SmoothedHandScreenPosition = CenterPosition;
+			ClampedHandScreenPosition = CenterPosition;
+			HandScreenPosition = CenterPosition;
+			LastValidRawHandScreenPosition = CenterPosition;
+			LastValidSmoothedHandScreenPosition = CenterPosition;
+			LastValidClampedHandScreenPosition = CenterPosition;
+			if (HUD)
+			{
+				HUD->UpdateTowelPosition(CenterPosition);
+				HUD->ShowTowel();
+				bTowelShownOnHUD = true;
+			}
+		}
 
 		UpdateWipeSound(false);
 
-		HideTowelVisual(HUD);
+		if (bHasEverValidInput)
+		{
+			HideTowelVisual(HUD);
+		}
 		UpdateTowelHUDStatus(HUD);
 		bWasUsingGraceInput = bUsingGraceInput;
 		LogLeapInputFrame(false);

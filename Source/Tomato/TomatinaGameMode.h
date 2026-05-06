@@ -326,6 +326,7 @@ private:
 	void ApplyStylishRankFromGauge();
 	FName GetStylishRankName(EStylishRank Rank) const;
 	void PushStylishStateToHUD();
+	void ForceTowelToCenterAfterCountdown();
 
 	UPROPERTY()
 	ATomatoDirtManager* CachedDirtManager = nullptr;
