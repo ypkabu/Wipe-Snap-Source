@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -115,7 +113,14 @@ public:
 	ELeapTowelAxis LeapHorizontalAxis = ELeapTowelAxis::Y;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Mapping")
+	bool bInvertLeapScreenX = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Mapping")
 	ELeapTowelAxis LeapVerticalAxis = ELeapTowelAxis::Z;
+
+	// 最初の有効入力を画面中央として扱う。通常は無効。
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Mapping")
+	bool bUseStartupScreenCenterCalibration = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Mapping")
 	FVector2D LeapInputCenter = FVector2D(0.0f, 25.0f);
@@ -138,7 +143,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Gating", meta=(ClampMin="0.1", ClampMax="1.0"))
 	float SpeedConfidenceRelaxFactor = 0.7f;
 
-	// 手を近づけすぎた時の警告。実機を見ながら軸としきい値を合わせる。
+	// 実機を見ながら軸としきい値を合わせる。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Too Close Warning")
 	bool bEnableLeapTooCloseWarning = true;
 
@@ -171,6 +176,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LeapMotion|Debug")
 	float SmoothedPalmHeight = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LeapMotion|Debug")
+	float LastRawPalmHeightMm = 0.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LeapMotion|Debug")
 	bool bLeapTooCloseToDevice = false;
@@ -215,6 +223,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Grace", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float SpeedDecayStartRatio = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Grace", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float GraceExitPositionBlendAlpha = 0.35f;
 
 	// スムージングは拭き取り中心用。速度判定はRaw由来を使う。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LeapMotion|Smoothing")
@@ -315,6 +326,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Wipe|Debug")
 	bool bLastGraceJustExited = false;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Wipe|Debug")
+	float LastDisplayMoveDistance = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wipe|Audio")
 	USoundBase* WipeLoopSound = nullptr;
 
@@ -336,7 +350,6 @@ public:
 	UPROPERTY(EditAnywhere, Category="Towel")
 	int32 TowelPenalty = -20;
 
-	// TakePhoto直前にGameModeから呼ばれる。
 	UFUNCTION(BlueprintCallable, Category="Towel")
 	bool CheckTowelInView(FVector2D TowelNormPos);
 
@@ -378,6 +391,7 @@ private:
 	float LastLeapConfidence = 0.0f;
 	float LastLeapVisibleTime = 0.0f;
 	float LastRawLeapHandSpeed = 0.0f;
+	float LastInputLostTime = 0.0f;
 	int32 LastLeapHandId = 0;
 	FVector2D PrevClampedHandScreenPosition = FVector2D(0.5f, 0.5f);
 	FVector2D LastValidRawHandScreenPosition = FVector2D(0.5f, 0.5f);

@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "TomatinaTowelSystem.h"
 
 #include "Components/AudioComponent.h"
@@ -79,6 +77,9 @@ void ATomatinaTowelSystem::ResetHandInputStateToCenter()
 	LastWipeSegmentLength = 0.0f;
 	LastWipeSampleCount = 0;
 	LastWipeAmountPerSample = 0.0f;
+	LastDisplayMoveDistance = 0.0f;
+	LastInputLostTime = 0.0f;
+	LastRawPalmHeightMm = 0.0f;
 	ResetHandInputFilter();
 }
 
@@ -86,7 +87,7 @@ void ATomatinaTowelSystem::ForceTowelToCenterAfterCountdown(float HoldSeconds)
 {
 	ResetHandInputStateToCenter();
 	ForceCenterRemainingTime = FMath::Max(0.0f, HoldSeconds);
-	bPendingStartupCenterCalibration = true;
+	bPendingStartupCenterCalibration = bUseStartupScreenCenterCalibration;
 	bHasStartupScreenOffset = false;
 	StartupScreenOffset = FVector2D::ZeroVector;
 	bTowelVisible = true;
@@ -113,27 +114,42 @@ void ATomatinaTowelSystem::ForceTowelToCenterAfterCountdown(float HoldSeconds)
 
 void ATomatinaTowelSystem::UpdateHandData(bool bDetected, FVector2D ScreenPosition, float Speed)
 {
-	FVector2D AdjustedScreenPosition = ScreenPosition;
-	if (bDetected)
+	if (!bDetected)
 	{
-		const FVector2D ClampedInputPosition = ClampNormalizedHandPosition(ScreenPosition);
-		if (bPendingStartupCenterCalibration)
-		{
-			StartupScreenOffset = FVector2D(0.5f, 0.5f) - ClampedInputPosition;
-			bHasStartupScreenOffset = true;
-			bPendingStartupCenterCalibration = false;
-		}
+		bHandDetected = false;
+		HandSpeed = 0.0f;
 
-		if (bHasStartupScreenOffset)
+		if (bDebugLeapInput && (!bHasLoggedBlueprintInputState || bDetected != bLastLoggedBlueprintInputDetected))
 		{
-			AdjustedScreenPosition = ScreenPosition + StartupScreenOffset;
+			bHasLoggedBlueprintInputState = true;
+			bLastLoggedBlueprintInputDetected = bDetected;
+			UE_LOG(LogTemp, Warning, TEXT("[TowelDiag] UpdateHandData Detected=0 (holding last valid position)"));
 		}
+		return;
 	}
 
-	bHandDetected         = bDetected;
+	FVector2D AdjustedScreenPosition = ScreenPosition;
+
+	const FVector2D ClampedInputPosition = ClampNormalizedHandPosition(ScreenPosition);
+	if (bUseStartupScreenCenterCalibration && bPendingStartupCenterCalibration)
+	{
+		StartupScreenOffset = FVector2D(0.5f, 0.5f) - ClampedInputPosition;
+		bHasStartupScreenOffset = true;
+		bPendingStartupCenterCalibration = false;
+	}
+
+	if (bUseStartupScreenCenterCalibration && bHasStartupScreenOffset)
+	{
+		AdjustedScreenPosition = ScreenPosition + StartupScreenOffset;
+	}
+	else
+	{
+		bHasStartupScreenOffset = false;
+		StartupScreenOffset = FVector2D::ZeroVector;
+	}
+
+	bHandDetected         = true;
 	RawHandScreenPosition = AdjustedScreenPosition;
-	ClampedHandScreenPosition = ClampNormalizedHandPosition(AdjustedScreenPosition);
-	HandScreenPosition = ClampedHandScreenPosition;
 	HandSpeed             = FMath::Max(0.0f, Speed);
 
 	if (bDebugLeapInput && (!bHasLoggedBlueprintInputState || bDetected != bLastLoggedBlueprintInputDetected))
@@ -246,13 +262,24 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 	LastWipeSegmentLength = 0.0f;
 	LastWipeSampleCount = 0;
 	LastWipeAmountPerSample = 0.0f;
+	LastDisplayMoveDistance = 0.0f;
+	LastInputLostTime = 0.0f;
 
 	if (bHandDetected)
 	{
 		bHasValidInput = true;
-		SmoothedHandScreenPosition = ApplyHandSmoothing(RawHandScreenPosition, DeltaTime);
+		const FVector2D PreviousDisplayPosition = ClampedHandScreenPosition;
+		const bool bGraceExitThisFrame = bWasUsingGraceInput;
+		const FVector2D NewlySmoothedPosition = ApplyHandSmoothing(RawHandScreenPosition, DeltaTime);
+		SmoothedHandScreenPosition = bGraceExitThisFrame
+			? FMath::Lerp(
+				LastValidSmoothedHandScreenPosition,
+				NewlySmoothedPosition,
+				FMath::Clamp(GraceExitPositionBlendAlpha, 0.0f, 1.0f))
+			: NewlySmoothedPosition;
 		ClampedHandScreenPosition = ClampNormalizedHandPosition(SmoothedHandScreenPosition);
 		HandScreenPosition = ClampedHandScreenPosition;
+		LastDisplayMoveDistance = FVector2D::Distance(PreviousDisplayPosition, ClampedHandScreenPosition);
 
 		// 速度は Clamp 後の座標差分ではなく BP 由来の生速度を使う。
 		// 画面端で座標が 0/1 に張り付いても、拭き取り/SE の速度判定を不自然に落とさないため。
@@ -268,6 +295,7 @@ void ATomatinaTowelSystem::Tick(float DeltaTime)
 	else if (bHasEverValidInput && InputGraceTime > 0.0f)
 	{
 		const float LostTime = NowSeconds - LastValidInputTime;
+		LastInputLostTime = LostTime;
 		if (LostTime <= InputGraceTime)
 		{
 			bHasValidInput = true;
@@ -644,8 +672,14 @@ FVector2D ATomatinaTowelSystem::ConvertLeapPositionToScreen(FVector LeapPosition
 		FMath::Max(LeapInputHalfRange.X, 1.0f),
 		FMath::Max(LeapInputHalfRange.Y, 1.0f));
 
+	float ScreenX = 0.5f + (Horizontal - LeapInputCenter.X) / (SafeHalfRange.X * 2.0f);
+	if (bInvertLeapScreenX)
+	{
+		ScreenX = 1.0f - ScreenX;
+	}
+
 	return FVector2D(
-		0.5f + (Horizontal - LeapInputCenter.X) / (SafeHalfRange.X * 2.0f),
+		ScreenX,
 		0.5f - (Vertical - LeapInputCenter.Y) / (SafeHalfRange.Y * 2.0f));
 }
 
@@ -686,6 +720,7 @@ void ATomatinaTowelSystem::UpdateLeapTooCloseState(FVector LeapPosition, bool bH
 	LastLeapDistanceValue = ReadLeapAxis(LeapPosition, LeapTooCloseAxis);
 	// Ultraleap plugin converts hand positions from mm to UE cm; thresholds are exposed as mm.
 	const float RawPalmHeightMm = LastLeapDistanceValue * 10.0f;
+	LastRawPalmHeightMm = RawPalmHeightMm;
 	const float Alpha = FMath::Clamp(HeightEMAAlpha, 0.0f, 1.0f);
 	if (!bHasSmoothedPalmHeight)
 	{
@@ -890,16 +925,27 @@ void ATomatinaTowelSystem::LogLeapInputFrame(bool bIsWiping) const
 	}
 
 	UE_LOG(LogTemp, Verbose,
-		TEXT("[TowelDiag] RawPalmPos=(%.2f,%.2f,%.2f) SmoothedPalmHeight=%.2f Confidence=%.3f VisibleTime=%.3f HandId=%d bGated=%d bUsingGraceInput=%d RawHandSpeed=%.2f ProcessedHandSpeed=%.2f bIsWiping=%d bIsTooClose=%d SegmentLength=%.4f SampleCount=%d AmountPerSample=%.4f bGraceJustExited=%d"),
+		TEXT("[TowelDiag] RawPalmPos=(%.2f,%.2f,%.2f) RawScreen=(%.3f,%.3f) SmoothedScreen=(%.3f,%.3f) ClampedScreen=(%.3f,%.3f) DisplayMove=%.4f RawPalmHeightMm=%.2f SmoothedPalmHeight=%.2f CloseEnterTimer=%.3f CloseExitTimer=%.3f Confidence=%.3f VisibleTime=%.3f HandId=%d bGated=%d bUsingGraceInput=%d LostTime=%.3f RawHandSpeed=%.2f ProcessedHandSpeed=%.2f bIsWiping=%d bIsTooClose=%d SegmentLength=%.4f SampleCount=%d AmountPerSample=%.4f bGraceJustExited=%d HasPrevWipe=%d"),
 		LastSelectedLeapPalmRawPosition.X,
 		LastSelectedLeapPalmRawPosition.Y,
 		LastSelectedLeapPalmRawPosition.Z,
+		RawHandScreenPosition.X,
+		RawHandScreenPosition.Y,
+		SmoothedHandScreenPosition.X,
+		SmoothedHandScreenPosition.Y,
+		ClampedHandScreenPosition.X,
+		ClampedHandScreenPosition.Y,
+		LastDisplayMoveDistance,
+		LastRawPalmHeightMm,
 		SmoothedPalmHeight,
+		CloseEnterTimer,
+		CloseExitTimer,
 		LastLeapConfidence,
 		LastLeapVisibleTime,
 		LastLeapHandId,
 		bLastLeapInputGated ? 1 : 0,
 		bUsingGraceInput ? 1 : 0,
+		LastInputLostTime,
 		LastRawLeapHandSpeed,
 		ProcessedHandSpeed,
 		bIsWiping ? 1 : 0,
@@ -907,7 +953,8 @@ void ATomatinaTowelSystem::LogLeapInputFrame(bool bIsWiping) const
 		LastWipeSegmentLength,
 		LastWipeSampleCount,
 		LastWipeAmountPerSample,
-		bLastGraceJustExited ? 1 : 0);
+		bLastGraceJustExited ? 1 : 0,
+		bHasPrevWipePosition ? 1 : 0);
 }
 
 void ATomatinaTowelSystem::UpdateWipeSound(bool bIsWiping)

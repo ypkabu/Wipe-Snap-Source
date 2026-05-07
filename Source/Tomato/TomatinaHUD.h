@@ -137,7 +137,10 @@ public:
 	void UpdateTowelPosition(FVector2D Pos);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="HUD|Towel")
-	FVector2D TowelVisualCenterOffset = FVector2D(-0.13f, -0.11f);
+	bool bApplyTowelVisualCenterOffset = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="HUD|Towel", meta=(EditCondition="bApplyTowelVisualCenterOffset"))
+	FVector2D TowelVisualCenterOffset = FVector2D::ZeroVector;
 
 	UFUNCTION(BlueprintCallable, Category="HUD|Towel")
 	void ShowTowel();

@@ -669,9 +669,12 @@ void ATomatinaHUD::UpdateTowelPosition(FVector2D Pos)
 
 	FVector2D TargetLocalPosition = FVector2D::ZeroVector;
 	bool bHasTargetLocalPosition = false;
+	const FVector2D VisualOffset = bApplyTowelVisualCenterOffset
+		? TowelVisualCenterOffset
+		: FVector2D::ZeroVector;
 	const FVector2D VisualPos(
-		FMath::Clamp(Pos.X + TowelVisualCenterOffset.X, 0.0f, 1.0f),
-		FMath::Clamp(Pos.Y + TowelVisualCenterOffset.Y, 0.0f, 1.0f));
+		FMath::Clamp(Pos.X + VisualOffset.X, 0.0f, 1.0f),
+		FMath::Clamp(Pos.Y + VisualOffset.Y, 0.0f, 1.0f));
 
 	if (UCanvasPanel* ParentCanvas = Cast<UCanvasPanel>(Towel->GetParent()))
 	{
