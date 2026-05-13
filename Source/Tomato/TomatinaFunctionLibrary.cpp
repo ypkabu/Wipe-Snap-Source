@@ -95,11 +95,7 @@ bool UTomatinaFunctionLibrary::CheckVisibility(
 	return true; // 最後まで遮蔽なし＝見えている
 }
 
-// -----------------------------------------------------------------------------
-// CalculatePhotoScore
-// Head / Root の 2 点で CheckVisibility を呼ぶ仕様
-// -----------------------------------------------------------------------------
-FPhotoResult UTomatinaFunctionLibrary::CalculatePhotoScore(
+FPhotoFramingPreviewResult UTomatinaFunctionLibrary::EvaluatePhotoFraming(
 	USceneCaptureComponent2D* ZoomCamera,
 	const TArray<ATomatinaTargetBase*>& Targets,
 	FName CurrentMission,
@@ -108,29 +104,31 @@ FPhotoResult UTomatinaFunctionLibrary::CalculatePhotoScore(
 {
 	if (bUtilityDebugLogEnabled)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CalculatePhotoScore 開始 Mission=%s Targets=%d"),
+		UE_LOG(LogTemp, Warning, TEXT("EvaluatePhotoFraming 開始 Mission=%s Targets=%d"),
 			*CurrentMission.ToString(), Targets.Num());
 	}
 
-	FPhotoResult Result;
-	Result.Score      = 0;
-	Result.BestTarget = nullptr;
-	Result.Comment    = TEXT("写ってない！");
+	FPhotoFramingPreviewResult Result;
+	Result.Comment = TEXT("写ってない！");
 
 	if (!ZoomCamera)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CalculatePhotoScore: ZoomCamera が null"));
+		UE_LOG(LogTemp, Warning, TEXT("EvaluatePhotoFraming: ZoomCamera が null"));
 		return Result;
 	}
 
 	int32 BestScore = -1;
 	FString BestComment = TEXT("写ってない！");
 	ATomatinaTargetBase* BestActor = nullptr;
+	EPhotoFramingType BestFramingType = EPhotoFramingType::None;
+	float BestScoreMultiplier = 0.0f;
+	bool bFoundMatchingTarget = false;
 
 	for (ATomatinaTargetBase* Target : Targets)
 	{
 		if (!IsValid(Target)) { continue; }
 		if (Target->MyType != CurrentMission) { continue; }
+		bFoundMatchingTarget = true;
 
 		// Head / Root 位置を取得
 		FVector HeadLoc = Target->GetActorLocation() + FVector(0.f, 0.f, 100.f);
@@ -160,11 +158,32 @@ FPhotoResult UTomatinaFunctionLibrary::CalculatePhotoScore(
 
 		int32   ThisScore   = 0;
 		FString ThisComment = TEXT("写ってない！");
+		EPhotoFramingType ThisFramingType = EPhotoFramingType::Invalid;
+		float ThisScoreMultiplier = 0.0f;
 
-		if (bHeadVisible && bRootVisible)      { ThisScore = TargetFullBodyScore; ThisComment = TEXT("全身バッチリ！"); }
-		else if (bHeadVisible)                 { ThisScore = TargetUpperBodyScore; ThisComment = TEXT("上半身だけ撮れた"); }
-		else if (bRootVisible)                 { ThisScore = TargetLowerBodyScore; ThisComment = TEXT("足だけ撮れた"); }
-		else                                   { ThisScore = 0; ThisComment = TEXT("写ってない！"); }
+		if (bHeadVisible && bRootVisible)
+		{
+			ThisScore = TargetFullBodyScore;
+			ThisComment = TEXT("全身バッチリ！");
+			ThisFramingType = EPhotoFramingType::FullBody;
+		}
+		else if (bHeadVisible)
+		{
+			ThisScore = TargetUpperBodyScore;
+			ThisComment = TEXT("上半身だけ撮れた");
+			ThisFramingType = EPhotoFramingType::UpperBody;
+		}
+		else if (bRootVisible)
+		{
+			ThisScore = TargetLowerBodyScore;
+			ThisComment = TEXT("足だけ撮れた");
+			ThisFramingType = EPhotoFramingType::LowerBody;
+		}
+
+		if (ThisScore > 0 && TargetFullBodyScore > 0)
+		{
+			ThisScoreMultiplier = static_cast<float>(ThisScore) / static_cast<float>(TargetFullBodyScore);
+		}
 
 		if (ThisScore > 0)
 		{
@@ -183,28 +202,57 @@ FPhotoResult UTomatinaFunctionLibrary::CalculatePhotoScore(
 			BestScore   = ThisScore;
 			BestComment = ThisComment;
 			BestActor   = Target;
+			BestFramingType = ThisFramingType;
+			BestScoreMultiplier = ThisScoreMultiplier;
 		}
 	}
 
 	if (BestScore < 0) { BestScore = 0; }
 
+	Result.bHasTarget = bFoundMatchingTarget;
+	Result.Score = BestScore;
+	Result.Comment = BestComment;
+	Result.BestTarget = (BestScore > 0) ? BestActor : nullptr;
+	Result.FramingType = bFoundMatchingTarget ? BestFramingType : EPhotoFramingType::None;
+	Result.ScoreMultiplier = BestScoreMultiplier;
+
+	return Result;
+}
+
+// -----------------------------------------------------------------------------
+// CalculatePhotoScore
+// Head / Root の 2 点で CheckVisibility を呼ぶ仕様
+// -----------------------------------------------------------------------------
+FPhotoResult UTomatinaFunctionLibrary::CalculatePhotoScore(
+	USceneCaptureComponent2D* ZoomCamera,
+	const TArray<ATomatinaTargetBase*>& Targets,
+	FName CurrentMission,
+	float ScreenWidth,
+	float ScreenHeight)
+{
+	const FPhotoFramingPreviewResult Framing = EvaluatePhotoFraming(
+		ZoomCamera, Targets, CurrentMission, ScreenWidth, ScreenHeight);
+
+	FPhotoResult Result;
+	Result.Score           = Framing.Score;
+	Result.BestTarget      = Framing.BestTarget;
+	Result.FramingType     = Framing.FramingType;
+	Result.ScoreMultiplier = Framing.ScoreMultiplier;
+	Result.Comment         = Framing.Comment;
+
 	// ── ポーズボーナス ────────────────────────────────────────────────
 	// ポーズ中のターゲットを撮影できていたらスコアを倍率で加算
-	if (BestActor && BestActor->bEnablePose && BestActor->bIsPosing && BestScore > 0)
+	if (Result.BestTarget && Result.BestTarget->bEnablePose && Result.BestTarget->bIsPosing && Result.Score > 0)
 	{
-		const int32 BoostedScore = FMath::RoundToInt(BestScore * BestActor->PoseScoreMultiplier);
+		const int32 BoostedScore = FMath::RoundToInt(Result.Score * Result.BestTarget->PoseScoreMultiplier);
 		if (bUtilityDebugLogEnabled)
 		{
 			UE_LOG(LogTemp, Warning, TEXT(" ポーズボーナス適用: %d → %d (x%.2f)"),
-				BestScore, BoostedScore, BestActor->PoseScoreMultiplier);
+				Result.Score, BoostedScore, Result.BestTarget->PoseScoreMultiplier);
 		}
-		BestScore = BoostedScore;
-		BestComment = FString::Printf(TEXT("%s ポーズボーナス！"), *BestComment);
+		Result.Score = BoostedScore;
+		Result.Comment = FString::Printf(TEXT("%s ポーズボーナス！"), *Result.Comment);
 	}
-
-	Result.Score      = BestScore;
-	Result.Comment    = BestComment;
-	Result.BestTarget = (BestScore > 0) ? BestActor : nullptr;
 
 	if (bUtilityDebugLogEnabled)
 	{

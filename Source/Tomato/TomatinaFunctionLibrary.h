@@ -14,6 +14,40 @@ class UCameraComponent;
 class UTextureRenderTarget2D;
 class USoundBase;
 
+UENUM(BlueprintType)
+enum class EPhotoFramingType : uint8
+{
+	None      UMETA(DisplayName="None"),
+	FullBody  UMETA(DisplayName="Full Body"),
+	UpperBody UMETA(DisplayName="Upper Body"),
+	LowerBody UMETA(DisplayName="Lower Body"),
+	Invalid   UMETA(DisplayName="Invalid"),
+};
+
+USTRUCT(BlueprintType)
+struct FPhotoFramingPreviewResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bHasTarget = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	EPhotoFramingType FramingType = EPhotoFramingType::None;
+
+	UPROPERTY(BlueprintReadOnly)
+	float ScoreMultiplier = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 Score = 0;
+
+	UPROPERTY(BlueprintReadOnly)
+	ATomatinaTargetBase* BestTarget = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	FString Comment;
+};
+
 USTRUCT(BlueprintType)
 struct FPhotoResult
 {
@@ -24,6 +58,12 @@ struct FPhotoResult
 
 	UPROPERTY(BlueprintReadOnly)
 	ATomatinaTargetBase* BestTarget = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	EPhotoFramingType FramingType = EPhotoFramingType::None;
+
+	UPROPERTY(BlueprintReadOnly)
+	float ScoreMultiplier = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly)
 	FString Comment;
@@ -45,6 +85,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Tomatina|Photo")
 	static FPhotoResult CalculatePhotoScore(
+		USceneCaptureComponent2D* ZoomCamera,
+		const TArray<ATomatinaTargetBase*>& Targets,
+		FName CurrentMission,
+		float ScreenWidth,
+		float ScreenHeight);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Tomatina|Photo")
+	static FPhotoFramingPreviewResult EvaluatePhotoFraming(
 		USceneCaptureComponent2D* ZoomCamera,
 		const TArray<ATomatinaTargetBase*>& Targets,
 		FName CurrentMission,

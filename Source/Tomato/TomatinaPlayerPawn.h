@@ -117,6 +117,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Zoom|Capture", meta=(ClampMin="0.0", ClampMax="2.0"))
 	float ZoomTransitionCaptureSeconds = 0.25f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Zoom|Preview", meta=(ClampMin="0.02", ClampMax="1.0"))
+	float FramingPreviewUpdateInterval = 0.1f;
+
 	// 空クリック時の仮想ヒット距離。空の鳥などにもズームできるようにする。
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Zoom")
 	float SkyFallbackDistance = 3000.f;
@@ -163,6 +166,7 @@ private:
 	FVector2D CurrentLookInput = FVector2D::ZeroVector;
 
 	float PhoneCaptureBurstRemaining = 0.f;
+	float FramingPreviewElapsed = 0.f;
 
 	void UpdateDualScreenLayoutRetry(float DeltaTime);
 	void UpdateZoomInterpolation(float RealDelta);
@@ -178,4 +182,5 @@ private:
 	void RequestPhoneCaptureBurst(float Duration);
 	void UpdatePhoneSceneCapture(float DeltaTime);
 	void CapturePhoneSceneNow();
+	void UpdateFramingPreview(ATomatinaHUD* HUD, float RealDelta);
 };

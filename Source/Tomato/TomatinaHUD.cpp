@@ -244,6 +244,120 @@ void ATomatinaHUD::DestroyPhoneWindow()
 		PhoneWindow.Reset();
 	}
 	PhoneViewWidget = nullptr;
+	RuntimeFramingPreviewText = nullptr;
+}
+
+void ATomatinaHUD::SetFramingPreviewResult(const FPhotoFramingPreviewResult& Result)
+{
+	if (!Result.bHasTarget || Result.FramingType == EPhotoFramingType::None)
+	{
+		SetFramingPreviewVisible(false);
+		return;
+	}
+
+	UTextBlock* PreviewText = FindOrCreateFramingPreviewText();
+	if (!PreviewText)
+	{
+		return;
+	}
+
+	PreviewText->SetText(FText::FromString(BuildFramingPreviewText(Result)));
+	PreviewText->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void ATomatinaHUD::SetFramingPreviewVisible(bool bVisible)
+{
+	UTextBlock* PreviewText = bVisible ? FindOrCreateFramingPreviewText() : RuntimeFramingPreviewText;
+	if (!PreviewText && PhoneViewWidget)
+	{
+		PreviewText = Cast<UTextBlock>(PhoneViewWidget->GetWidgetFromName(TEXT("TXT_FramingPreview")));
+		if (!PreviewText)
+		{
+			PreviewText = Cast<UTextBlock>(PhoneViewWidget->GetWidgetFromName(TEXT("TXT_FramingPreviewResult")));
+		}
+	}
+
+	if (PreviewText)
+	{
+		PreviewText->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+UTextBlock* ATomatinaHUD::FindOrCreateFramingPreviewText()
+{
+	if (RuntimeFramingPreviewText)
+	{
+		return RuntimeFramingPreviewText;
+	}
+
+	if (!PhoneViewWidget)
+	{
+		return nullptr;
+	}
+
+	if (UTextBlock* Existing = Cast<UTextBlock>(PhoneViewWidget->GetWidgetFromName(TEXT("TXT_FramingPreview"))))
+	{
+		RuntimeFramingPreviewText = Existing;
+		return RuntimeFramingPreviewText;
+	}
+	if (UTextBlock* Existing = Cast<UTextBlock>(PhoneViewWidget->GetWidgetFromName(TEXT("TXT_FramingPreviewResult"))))
+	{
+		RuntimeFramingPreviewText = Existing;
+		return RuntimeFramingPreviewText;
+	}
+
+	if (!PhoneViewWidget->WidgetTree)
+	{
+		return nullptr;
+	}
+
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(PhoneViewWidget->WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		RootCanvas = Cast<UCanvasPanel>(PhoneViewWidget->WidgetTree->FindWidget(TEXT("RootCanvas")));
+	}
+	if (!RootCanvas)
+	{
+		return nullptr;
+	}
+
+	RuntimeFramingPreviewText = PhoneViewWidget->WidgetTree->ConstructWidget<UTextBlock>(
+		UTextBlock::StaticClass(), TEXT("TXT_FramingPreview_Runtime"));
+	RuntimeFramingPreviewText->SetJustification(ETextJustify::Center);
+	RuntimeFramingPreviewText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	RuntimeFramingPreviewText->SetShadowColorAndOpacity(FLinearColor::Black);
+	RuntimeFramingPreviewText->SetShadowOffset(FVector2D(2.0f, 2.0f));
+	RuntimeFramingPreviewText->SetVisibility(ESlateVisibility::Collapsed);
+
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(RuntimeFramingPreviewText);
+	Slot->SetAnchors(FAnchors(0.5f, 0.0f));
+	Slot->SetAlignment(FVector2D(0.5f, 0.0f));
+	Slot->SetPosition(FVector2D(0.0f, 48.0f));
+	Slot->SetSize(FVector2D(720.0f, 80.0f));
+	Slot->SetZOrder(100);
+
+	return RuntimeFramingPreviewText;
+}
+
+FString ATomatinaHUD::BuildFramingPreviewText(const FPhotoFramingPreviewResult& Result) const
+{
+	if (Result.FramingType == EPhotoFramingType::Invalid)
+	{
+		return TEXT("構図を調整");
+	}
+
+	const int32 Percent = FMath::Max(0, FMath::RoundToInt(Result.ScoreMultiplier * 100.0f));
+	switch (Result.FramingType)
+	{
+	case EPhotoFramingType::FullBody:
+		return FString::Printf(TEXT("全身OK %d%%"), Percent);
+	case EPhotoFramingType::UpperBody:
+		return FString::Printf(TEXT("上半身OK %d%%"), Percent);
+	case EPhotoFramingType::LowerBody:
+		return FString::Printf(TEXT("下半身OK %d%%"), Percent);
+	default:
+		return FString();
+	}
 }
 
 bool ATomatinaHUD::BindZoomMaterialToWidget(UUserWidget* Widget, FName PreferredImageName, const TCHAR* WidgetLabel)

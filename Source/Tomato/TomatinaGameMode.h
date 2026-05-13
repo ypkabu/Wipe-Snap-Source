@@ -4,6 +4,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "TomatinaSoundCue.h"         // FTomatinaSoundCue
 #include "TomatinaTargetBase.h"
+#include "TomatinaFunctionLibrary.h"
 #include "TomatinaGameMode.generated.h"
 
 class USceneCaptureComponent2D;
@@ -267,6 +268,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Tomatina|Photo")
 	void TakePhoto(USceneCaptureComponent2D* ZoomCamera);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Tomatina|Photo")
+	FPhotoFramingPreviewResult EvaluateCurrentPhotoFraming(USceneCaptureComponent2D* ZoomCamera) const;
 
 	UFUNCTION(BlueprintCallable, Category="Tomatina|Mission")
 	void StartMission(int32 Index);

@@ -553,6 +553,16 @@ void ATomatinaGameMode::TakePhoto(USceneCaptureComponent2D* ZoomCamera)
 	PushStylishStateToHUD();
 }
 
+FPhotoFramingPreviewResult ATomatinaGameMode::EvaluateCurrentPhotoFraming(USceneCaptureComponent2D* ZoomCamera) const
+{
+	static const TArray<ATomatinaTargetBase*> EmptyTargets;
+	const TArray<ATomatinaTargetBase*>& Targets =
+		TargetSpawner ? TargetSpawner->ActiveTargets : EmptyTargets;
+
+	return UTomatinaFunctionLibrary::EvaluatePhotoFraming(
+		ZoomCamera, Targets, CurrentMission, PhoneWidth, PhoneHeight);
+}
+
 void ATomatinaGameMode::BeginFinalResultBuildup()
 {
 	UE_LOG(LogTemp, Warning, TEXT("ATomatinaGameMode::BeginFinalResultBuildup (%.2fs)"),

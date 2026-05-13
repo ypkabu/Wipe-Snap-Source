@@ -199,6 +199,7 @@ void ATomatinaPlayerPawn::Tick(float DeltaTime)
 	CurrentLookInput = FVector2D::ZeroVector;
 
 	UpdateZoomHUDCursor(HUD);
+	UpdateFramingPreview(HUD, RealDelta);
 
 	ResetZoomViewWhenIdle();
 
@@ -587,6 +588,38 @@ void ATomatinaPlayerPawn::UpdatePhoneSceneCapture(float DeltaTime)
 	{
 		CapturePhoneSceneNow();
 	}
+}
+
+void ATomatinaPlayerPawn::UpdateFramingPreview(ATomatinaHUD* HUD, float RealDelta)
+{
+	if (!HUD)
+	{
+		return;
+	}
+
+	if (!bIsZooming)
+	{
+		HUD->SetFramingPreviewVisible(false);
+		FramingPreviewElapsed = FramingPreviewUpdateInterval;
+		return;
+	}
+
+	FramingPreviewElapsed += RealDelta;
+	const float SafeInterval = FMath::Max(FramingPreviewUpdateInterval, 0.02f);
+	if (FramingPreviewElapsed < SafeInterval)
+	{
+		return;
+	}
+	FramingPreviewElapsed = 0.f;
+
+	ATomatinaGameMode* GM = Cast<ATomatinaGameMode>(UGameplayStatics::GetGameMode(this));
+	if (!GM || !SceneCapture_Zoom)
+	{
+		HUD->SetFramingPreviewVisible(false);
+		return;
+	}
+
+	HUD->SetFramingPreviewResult(GM->EvaluateCurrentPhotoFraming(SceneCapture_Zoom));
 }
 
 void ATomatinaPlayerPawn::CapturePhoneSceneNow()

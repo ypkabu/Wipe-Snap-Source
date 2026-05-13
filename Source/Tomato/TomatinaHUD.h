@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "TomatoDirtManager.h"
+#include "TomatinaFunctionLibrary.h"
 #include "TomatinaHUD.generated.h"
 
 class UUserWidget;
@@ -212,6 +213,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="HUD|Leap")
 	void UpdateLeapDistanceWarning(bool bVisible);
 
+	UFUNCTION(BlueprintCallable, Category="HUD|Phone")
+	void SetFramingPreviewResult(const FPhotoFramingPreviewResult& Result);
+
+	UFUNCTION(BlueprintCallable, Category="HUD|Phone")
+	void SetFramingPreviewVisible(bool bVisible);
+
 protected:
 	UPROPERTY() UUserWidget* ViewFinderWidget     = nullptr;
 	UPROPERTY() UUserWidget* CursorWidget         = nullptr;
@@ -231,6 +238,7 @@ protected:
 	UPROPERTY() UUserWidget* ShutterFlashWidget   = nullptr;
 	UPROPERTY() UUserWidget* LoadingWidget        = nullptr;
 	UPROPERTY() UTextBlock* RuntimeLeapDistanceWarningText = nullptr;
+	UPROPERTY() UTextBlock* RuntimeFramingPreviewText = nullptr;
 
 private:
 	// TimeDilation=0でもフラッシュを消すため実時間で見る。
@@ -259,6 +267,10 @@ private:
 	bool ConfigureZoomImageContent(class UImage* ImageWidget, const TCHAR* WidgetLabel);
 
 	bool ForceWidgetToFillParentCanvas(UWidget* Widget, const TCHAR* WidgetLabel);
+
+	UTextBlock* FindOrCreateFramingPreviewText();
+
+	FString BuildFramingPreviewText(const FPhotoFramingPreviewResult& Result) const;
 
 	void CreatePhoneWindow();
 
