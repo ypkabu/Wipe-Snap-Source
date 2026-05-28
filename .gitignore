@@ -1,0 +1,30 @@
+# Unreal generated files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Unreal binary assets are intentionally not part of this public mirror
+Content/
+Plugins/
+*.uasset
+*.umap
+
+# Local editor and OS files
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local workspace files
+*.code-workspace
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
