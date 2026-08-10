@@ -45,7 +45,7 @@
 
 | 機能 | 主なファイル | 確認できる内容 |
 | --- | --- | --- |
-| スマホファインダー / カメラ表示 | `TomatinaPlayerPawn.*`, `TomatinaHUD.*` | スマホ側表示とファインダー更新処理 |
+| スマホファインダー / カメラ表示 | `TomatinaPlayerPawn.*`, `TomatinaHUD.*` | スマートフォン側の表示とファインダー更新処理 |
 | Leap Motionタオル入力 | `TomatinaTowelSystem.*` | 入力変換、平滑化、ゲート処理、拭き取り要求生成 |
 | 汚れ拭き取り管理 | `TomatoDirtManager.*` | 入力処理と汚れ状態管理の責務分離 |
 | 撮影判定 / フレーミングプレビュー | `TomatinaGameMode.*`, `TomatinaHUD.*` | プレビューUIと撮影判定で共通化した構図評価 |
@@ -56,14 +56,14 @@
 ### スマートフォン用ファインダー表示
 
 メイン画面とは別にスマートフォン側の表示を管理するため、
-Slate `SWindow` とスマホ表示用Widgetを使用しました。
+Slate `SWindow` とスマートフォン表示用のウィジェットを使用しました。
 これにより、展示環境でメインモニターとスマートフォン表示を独立して扱える構成にしました。
 
 ### SceneCapture2D / RenderTargetによる映像描画
 
 ズームファインダーには `SceneCapture2D` と `RenderTarget` を使用しました。
-スマートフォン側の表示を安定させるため、RenderTargetを直接Widgetへ割り当てるのではなく、
-Dynamic Material Instanceを経由して更新する構成にしています。
+スマートフォン側の表示を安定させるため、RenderTargetをウィジェットへ直接割り当てる方法ではなく、
+Dynamic Material Instanceを経由して更新する構成にしました。
 
 ### Leap Motionによるタオル操作
 
@@ -90,7 +90,7 @@ Leap Motionから取得した手の動きを、汚れ拭き取りに使用する
 このリポジトリ単体でゲーム全体をビルド・実行することを目的としていません。
 
 元プロジェクトには、Unreal Engineのバイナリアセット、Blueprintアセット、
-マップ、第三者アセット、Ultraleap Tracking Pluginが含まれます。
+マップ、第三者アセット、Ultraleap Trackingプラグインが含まれます。
 これらは権利・再配布範囲がソースコードとは異なるため、本リポジトリには含めていません。
 
 含めていない主なもの：
@@ -103,7 +103,7 @@ Leap Motionから取得した手の動きを、汚れ拭き取りに使用する
 
 一部のソースコードは `UltraleapTracking` モジュール、`ULeapComponent`、
 `IUltraleapTrackingPlugin` を参照しています。
-完全なローカルビルドには、対応するUltraleap Tracking Pluginと、
+完全なローカル環境でのビルドには、対応するUltraleap Trackingプラグインと、
 非公開のプロジェクトアセット・設定の復元が必要です。
 
 ## チーム制作・公開範囲について
@@ -123,7 +123,7 @@ noreplyメールアドレスを使用しています。
 これらの変更を私個人の成果として主張するものではありません。
 
 本リポジトリには、第三者アセット、Unreal Engineのバイナリアセット、
-マップ、Plugin本体を再配布していません。
+マップ、プラグイン本体を再配布していません。
 
 本ポートフォリオミラーに対して、オープンソースライセンスは付与していません。
 コード閲覧を目的として公開しています。
