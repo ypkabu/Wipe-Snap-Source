@@ -20,6 +20,8 @@
 
 ## デモ
 
+この作品はLeap Motion等の展示機材を使用するため、公開Buildではなくプレイ動画と担当ソースを公開しています。
+
 - [プレイ動画 - Wipe&Snap](https://youtu.be/YlQxtFcei3Y)
 - [技術記事 - Zenn](https://zenn.dev/ippon/articles/32ad6608d7eb30)
 
@@ -44,11 +46,12 @@
 
 | 機能 | 主なファイル | 確認できる内容 |
 | --- | --- | --- |
-| スマホファインダー / カメラ表示 | `TomatinaPlayerPawn.*`, `TomatinaHUD.*` | スマートフォン側の表示とファインダー更新処理 |
-| Leap Motionタオル入力 | `TomatinaTowelSystem.*` | 入力変換、平滑化、ゲート処理、拭き取り要求生成 |
-| 汚れ拭き取り管理 | `TomatoDirtManager.*` | 入力処理と汚れ状態管理の責務分離 |
-| 撮影判定 / フレーミングプレビュー | `TomatinaGameMode.*`, `TomatinaHUD.*` | プレビューUIと撮影判定で共通化した構図評価 |
-| ターゲット / 投射物処理 | `TomatinaTargetBase.*`, `TomatinaProjectile.*`, `TomatinaProjectileSpawner.*` | ゲーム内インタラクションと生成処理 |
+| スマホファインダー / SWindow | [TomatinaHUD.cpp](Source/Tomato/TomatinaHUD.cpp) | 独立Window生成、Dynamic Material経由のRenderTarget表示 |
+| SceneCapture2D / 更新タイミング | [TomatinaPlayerPawn.cpp](Source/Tomato/TomatinaPlayerPawn.cpp) | 自動Capture無効化、明示的なCapture要求、フレーミング評価の間隔制御 |
+| Leap Motionタオル入力 | [TomatinaTowelSystem.cpp](Source/Tomato/TomatinaTowelSystem.cpp) | 入力変換、平滑化、ゲート処理、拭き取り要求生成 |
+| 汚れ拭き取り管理 | [TomatoDirtManager.cpp](Source/Tomato/TomatoDirtManager.cpp) | 入力処理と汚れ状態管理の責務分離 |
+| 撮影判定 / フレーミングプレビュー | [TomatinaFunctionLibrary.cpp](Source/Tomato/TomatinaFunctionLibrary.cpp)、[TomatinaGameMode.cpp](Source/Tomato/TomatinaGameMode.cpp) | 撮影とプレビューから呼ぶ共通の `EvaluatePhotoFraming` |
+| ターゲット / 投射物処理 | [TomatinaTargetBase.cpp](Source/Tomato/TomatinaTargetBase.cpp)、[TomatinaProjectile.cpp](Source/Tomato/TomatinaProjectile.cpp)、[TomatinaProjectileSpawner.cpp](Source/Tomato/TomatinaProjectileSpawner.cpp) | ゲーム内インタラクションと生成処理 |
 
 ## 技術的な工夫
 
@@ -83,6 +86,12 @@ Leap Motionから取得した手の動きを、汚れ拭き取りに使用する
 撮影スコア判定と同じ副作用のない評価処理を用いることで、
 プレビュー表示と実際の撮影結果がずれないようにしました。
 
+### 更新処理の制御
+
+`TomatinaPlayerPawn`ではSceneCaptureの自動更新を無効にし、明示的な要求でCaptureします。
+フレーミングプレビューの評価は設定可能な間隔（既定0.1秒）で行います。
+コードから更新方式は確認できますが、本公開ソースだけで負荷の改善率や実機での安定性を再計測したものではありません。
+
 ## 本リポジトリの位置付け
 
 本リポジトリは、担当したコードの閲覧を目的とした公開リポジトリであり、
@@ -104,6 +113,9 @@ Leap Motionから取得した手の動きを、汚れ拭き取りに使用する
 `IUltraleapTrackingPlugin` を参照しています。
 完全なローカル環境でのビルドには、対応するUltraleap Trackingプラグインと、
 非公開のプロジェクトアセット・設定の復元が必要です。
+
+2026-10-03の確認はREADMEの参照先と公開C++実装の照合です。
+完全なBuild、PIE、Leap Motion・スマートフォン実機動作は今回未検証であり、コンパイル成功を保証しません。
 
 ## チーム制作・公開範囲について
 

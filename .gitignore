@@ -22,6 +22,9 @@ Thumbs.db
 *.sln.docstates
 
 # Local workspace files
+.env
+.env.*
+!.env.example
 *.code-workspace
 
 # Logs and temporary files
