@@ -1,140 +1,110 @@
 # Wipe&Snap
 
-## 概要
+Unreal Engine 5 / C++ で作った、2人協力の撮影アクションゲームです。
+1P は Joy-Con を付けたカメラ型コントローラーとスマートフォンのファインダーで被写体を撮り、
+2P は Leap Motion を使って、レンズについたトマトの汚れを手で拭き取ります。
 
-『Wipe&Snap』は、Unreal Engine 5 / C++で制作した2人協力型の撮影アクションゲームです。
-1Pはカメラ型コントローラーとスマートフォンのファインダー画面を使って被写体を撮影し、
-2PはLeap Motionによる手入力でレンズに付着したトマト汚れを拭き取ります。
+このリポジトリには、チームの開発リポジトリから、私の担当部分を中心に C++ のソースだけを抜き出して置いています。
 
-本リポジトリは、元のチーム開発リポジトリから公開可能な担当ソースコードをまとめたものです。
+## 動画・記事
+
+- [プレイ動画（YouTube）](https://youtu.be/YlQxtFcei3Y)
+- [技術記事（Zenn）](https://zenn.dev/ippon/articles/32ad6608d7eb30)
+
+Leap Motion などの展示用の機材がないと遊べないため、ビルドは公開していません。
 
 ## 開発情報
 
 | 項目 | 内容 |
 | --- | --- |
-| ジャンル | 2人協力型撮影アクションゲーム |
-| 開発体制 | 4人チーム / 約2か月 |
+| ジャンル | 2人協力の撮影アクション |
+| 制作期間 | 2026年3月〜5月（約2か月） |
+| チーム | 4人（プログラマー2人・デザイナー1人・プランナー1人） |
 | 使用技術 | Unreal Engine 5 / C++ / Leap Motion Controller |
-| 自分の担当 | クライアント実装・外部デバイス連携・操作体験に関わる機能 |
-| 公開範囲 | 自身の担当範囲に関するソースコード |
+| 私の役割 | リーダー、プログラマー |
 
-## デモ
+## 担当したこと
 
-この作品はLeap Motion等の展示機材を使用するため、公開Buildではなくプレイ動画と担当ソースを公開しています。
+私の担当部分はほぼすべて C++ で、Blueprint の部分はもう1人のプログラマーが作っています。
 
-- [プレイ動画 - Wipe&Snap](https://youtu.be/YlQxtFcei3Y)
-- [技術記事 - Zenn](https://zenn.dev/ippon/articles/32ad6608d7eb30)
+- スマートフォン用ファインダーの別ウィンドウ表示（Slate の `SWindow`）
+- ファインダー映像の描画（`SceneCapture2D` / `RenderTarget`）
+- Leap Motion でのタオル操作、汚れの拭き取り判定、タオルの耐久値
+- 構図のプレビュー表示と撮影判定
+- ズームカメラの動きと、カメラが壁にめり込まないようにする処理
+- ファインダー表示とトマトの演出まわりの描画負荷の確認
 
-## 自分の担当
+ほかのメンバーは、3Dアセット、アニメーションの設定、レベルの配置、イラスト、ルールの検討、カメラ型コントローラー本体の制作などを担当しました。
 
-本作は4人チームで制作しました。私は主に、プレイヤーの操作体験と
-外部デバイス連携に関わるC++実装を担当しました。
+## 主なファイル
 
-- Slate `SWindow` を用いたスマートフォン用ファインダー表示
-- `SceneCapture2D` / `RenderTarget` を用いたファインダー映像描画
-- Leap Motionによるタオル操作入力
-- 汚れ拭き取り判定と耐久値処理
-- スマートフォン画面上のフレーミングプレビュー表示
-- ズームカメラの挙動と壁抜け対策
-- ファインダー表示およびトマト演出周辺の描画負荷確認
-
-他メンバーは、3Dアセット、アニメーション設定、レベル配置、イラスト、
-ルール検討、物理カメラ型コントローラー制作などを担当しています。
-本リポジトリでは、それらを私個人の成果として扱いません。
-
-## 主な実装
-
-| 機能 | 主なファイル | 確認できる内容 |
+| 機能 | ファイル | 内容 |
 | --- | --- | --- |
-| スマホファインダー / SWindow | [TomatinaHUD.cpp](Source/Tomato/TomatinaHUD.cpp) | 独立Window生成、Dynamic Material経由のRenderTarget表示 |
-| SceneCapture2D / 更新タイミング | [TomatinaPlayerPawn.cpp](Source/Tomato/TomatinaPlayerPawn.cpp) | 自動Capture無効化、明示的なCapture要求、フレーミング評価の間隔制御 |
-| Leap Motionタオル入力 | [TomatinaTowelSystem.cpp](Source/Tomato/TomatinaTowelSystem.cpp) | 入力変換、平滑化、ゲート処理、拭き取り要求生成 |
-| 汚れ拭き取り管理 | [TomatoDirtManager.cpp](Source/Tomato/TomatoDirtManager.cpp) | 入力処理と汚れ状態管理の責務分離 |
-| 撮影判定 / フレーミングプレビュー | [TomatinaFunctionLibrary.cpp](Source/Tomato/TomatinaFunctionLibrary.cpp)、[TomatinaGameMode.cpp](Source/Tomato/TomatinaGameMode.cpp) | 撮影とプレビューから呼ぶ共通の `EvaluatePhotoFraming` |
-| ターゲット / 投射物処理 | [TomatinaTargetBase.cpp](Source/Tomato/TomatinaTargetBase.cpp)、[TomatinaProjectile.cpp](Source/Tomato/TomatinaProjectile.cpp)、[TomatinaProjectileSpawner.cpp](Source/Tomato/TomatinaProjectileSpawner.cpp) | ゲーム内インタラクションと生成処理 |
+| スマホのファインダー | [TomatinaHUD.cpp](Source/Tomato/TomatinaHUD.cpp) | 別ウィンドウの作成、マテリアル経由での映像表示 |
+| ファインダー映像の更新 | [TomatinaPlayerPawn.cpp](Source/Tomato/TomatinaPlayerPawn.cpp) | 必要なときだけ映像を描く処理、構図判定の間隔 |
+| Leap Motion のタオル入力 | [TomatinaTowelSystem.cpp](Source/Tomato/TomatinaTowelSystem.cpp) | 手の位置の変換、平滑化、手を見失ったときの処理、拭き取る位置の計算 |
+| 汚れの管理 | [TomatoDirtManager.cpp](Source/Tomato/TomatoDirtManager.cpp) | 汚れの位置と濃さの管理 |
+| 撮影判定・構図プレビュー | [TomatinaFunctionLibrary.cpp](Source/Tomato/TomatinaFunctionLibrary.cpp)、[TomatinaGameMode.cpp](Source/Tomato/TomatinaGameMode.cpp) | 撮影とプレビューで共通の `EvaluatePhotoFraming` |
+| ターゲット・トマト | [TomatinaTargetBase.cpp](Source/Tomato/TomatinaTargetBase.cpp)、[TomatinaProjectile.cpp](Source/Tomato/TomatinaProjectile.cpp)、[TomatinaProjectileSpawner.cpp](Source/Tomato/TomatinaProjectileSpawner.cpp) | 撮影するターゲットと、投げられるトマトの処理 |
 
 ## 技術的な工夫
 
-### スマートフォン用ファインダー表示
+### スマートフォンを別ウィンドウにした
 
-メイン画面とは別にスマートフォン側の表示を管理するため、
-Slate `SWindow` とスマートフォン表示用のウィジェットを使用しました。
-これにより、展示環境でメインモニターとスマートフォン表示を独立して扱える構成にしました。
+最初は1つのウィンドウを、メインモニターとスマートフォンの2画面にまたがせていました。
+`SWindow` でスマートフォン用のウィンドウを分けてからは、展示前に合わせるのはそのウィンドウの位置と大きさだけになりました。
+長いときは約1時間かかっていた画面合わせが、数分で終わるようになっています。
 
-### SceneCapture2D / RenderTargetによる映像描画
+### ファインダー映像の描画
 
-ズームファインダーには `SceneCapture2D` と `RenderTarget` を使用しました。
-スマートフォン側の表示を安定させるため、RenderTargetをウィジェットへ直接割り当てる方法ではなく、
-Dynamic Material Instanceを経由して更新する構成にしました。
+ズームしたときの映像は、`SceneCapture2D` で `RenderTarget` に描いています。
+別ウィンドウでは `RenderTarget` を画像に直接貼ると映像が更新されない問題があるため、マテリアル（Dynamic Material Instance）を通して毎フレーム映像を渡しています。
 
-### Leap Motionによるタオル操作
+`SceneCapture2D` は毎フレーム自動では描かず、ズーム中など必要なときだけ `CaptureScene()` を呼んでいます。
 
-Leap Motionから取得した手の動きを、汚れ拭き取りに使用する正規化画面座標へ変換しています。
-意図しない反応を減らすため、入力ゲート、平滑化、短時間の入力猶予、
-画面端処理、手がデバイスに近すぎる場合の警告表示を実装しました。
+### Leap Motion のタオル操作
 
-### 汚れ拭き取り処理の責務分離
+Leap Motion で取った手の位置を画面上の位置に変えて、汚れの拭き取りに使っています。
+Ultraleap Visualizer で確かめると、速く動かしたときに手を見失うのはデバイス側でも起きていました。
+そこで、ゲーム側では起きていたことを4つに分けて、それぞれ次の処理を入れています。
 
-タオル入力側では汚れテクスチャの状態を直接管理せず、
-正規化した拭き取り要求を `ATomatoDirtManager` へ送る構成にしました。
-入力処理と汚れ状態管理を分離し、調整・拡張しやすくしています。
+| 起きていたこと | 入れている処理 |
+| --- | --- |
+| 手を一瞬見失う | 少しの間（コードの既定値で0.2秒）は直前の位置を保ち、速度を落としながら拭き取りを続ける |
+| 位置が細かく揺れる | 位置を平滑化する |
+| 拭き取りのオン・オフがばたつく | 拭き始めと拭き続けで、速度のしきい値を分ける |
+| 速く動かすと汚れを飛び越える | 前のフレームの位置との間を線でつなぎ、途中の点でも拭き取る（1フレームで最大8点） |
 
-### フレーミングプレビュー
+手を Leap Motion に近づけすぎたときは、画面に「手を離してね」と出します。
 
-スマートフォンのファインダー上で、現在の構図が全身・上半身・下半身・無効の
-どれに該当するかを事前表示します。
-撮影スコア判定と同じ副作用のない評価処理を用いることで、
-プレビュー表示と実際の撮影結果がずれないようにしました。
+### 入力と汚れの管理を分けた
 
-### 更新処理の制御
+タオル側は「画面のどこをどれだけ拭くか」を計算して `ATomatoDirtManager` に渡すだけにして、汚れの状態は `ATomatoDirtManager` が持っています。
 
-`TomatinaPlayerPawn`ではSceneCaptureの自動更新を無効にし、明示的な要求でCaptureします。
-フレーミングプレビューの評価は設定可能な間隔（既定0.1秒）で行います。
-コードから更新方式は確認できますが、本公開ソースだけで負荷の改善率や実機での安定性を再計測したものではありません。
+### 構図のプレビュー
 
-## 本リポジトリの位置付け
+スマートフォンのファインダーに、今の構図が「全身」「上半身」「下半身」のどれになるかと、そのときの倍率を出します。構図が合っていないときは「構図を調整」と出ます。
+プレビューと実際の撮影で判定がずれないように、どちらも同じ関数（`EvaluatePhotoFraming`）で判定しています。
+プレビューの判定は0.1秒ごと（既定値）です。
 
-本リポジトリは、担当したコードの閲覧を目的とした公開リポジトリであり、
-このリポジトリ単体でゲーム全体をビルド・実行することを目的としていません。
+## このリポジトリについて
 
-元プロジェクトには、Unreal Engineのバイナリアセット、Blueprintアセット、
-マップ、第三者アセット、Ultraleap Trackingプラグインが含まれます。
-これらは権利・再配布範囲がソースコードとは異なるため、本リポジトリには含めていません。
+このリポジトリだけではビルドできません。
+元のプロジェクトのうち、第三者のアセットやプラグインなど再配布できないものと、ビルドで生成されるファイルは入れていません。
 
-含めていない主なもの：
-
-- `Content/`
-- `.uasset` / `.umap`
+- `Content/`（`.uasset` / `.umap`）
 - `Plugins/UltraleapTracking_ue5_4-5.0.1/`
-- `Binaries/`, `Intermediate/`, `Saved/`, `DerivedDataCache/`
-- 非公開設定およびローカルエディタ設定
+- `Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/`
+- 公開しない設定ファイル、エディタのローカル設定
 
-一部のソースコードは `UltraleapTracking` モジュール、`ULeapComponent`、
-`IUltraleapTrackingPlugin` を参照しています。
-完全なローカル環境でのビルドには、対応するUltraleap Trackingプラグインと、
-非公開のプロジェクトアセット・設定の復元が必要です。
+ソースの一部は Ultraleap Tracking プラグイン（`UltraleapTracking` モジュール、`ULeapComponent`）を使っています。
+ビルドするには、このプラグインと、公開していないアセット・設定が必要です。
 
-2026-10-03の確認はREADMEの参照先と公開C++実装の照合です。
-完全なBuild、PIE、Leap Motion・スマートフォン実機動作は今回未検証であり、コンパイル成功を保証しません。
+## コミット履歴について
 
-## チーム制作・公開範囲について
+コミット履歴には、私と hato（實光駿斗）さんの変更が入っています。
+hato さんの担当は、3Dアセットの調整、アニメーションの設定、観客・投げる人・ターゲットなどの配置、効果音の導入と設定です。
 
-### 制作メンバー
+## ライセンス
 
-- 嶋田一歩：クライアント実装、外部デバイス連携、操作体験に関わる機能
-- hato（實光駿斗）：3Dアセット調整、アニメーション設定、観客・投擲者・ターゲット等のオブジェクト配置、SE導入・設定
-
-『Wipe&Snap』はチーム制作作品です。
-本リポジトリは、再配布できないアセット、非公開設定、個人情報を除外するため、
-元の開発リポジトリから公開用に履歴を抽出しています。
-
-履歴には、共同開発者である hato（實光駿斗）の変更も含まれています。
-公開履歴では、個人メールアドレスを公開しないため、GitHubが同氏に提供する
-noreplyメールアドレスを使用しています。
-これらの変更を私個人の成果として主張するものではありません。
-
-本リポジトリには、第三者アセット、Unreal Engineのバイナリアセット、
-マップ、プラグイン本体を再配布していません。
-
-本公開リポジトリに対して、オープンソースライセンスは付与していません。
-コード閲覧を目的として公開しています。
+ライセンスは付けていません。コードを読んでもらうための公開です。
